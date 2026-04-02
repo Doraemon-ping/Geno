@@ -1,0 +1,262 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>加入宗亲 - 赵氏家谱</title>
+    <style>
+        :root {
+            --primary: #8b4513;
+            --accent: #b22222;
+            --bg: #fdfaf2;
+        }
+
+        body {
+            background: var(--bg);
+            font-family: "Microsoft YaHei", serif;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .reg-card {
+            background: #fff;
+            width: 400px;
+            padding: 40px;
+            border: 1px solid #e0d5c1;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+            position: relative;
+        }
+
+            .reg-card::after {
+                content: "";
+                position: absolute;
+                top: 5px;
+                left: 5px;
+                right: 5px;
+                bottom: 5px;
+                border: 1px solid #f0e6d2;
+                pointer-events: none;
+            }
+
+        .title {
+            text-align: center;
+            color: var(--primary);
+            margin-bottom: 30px;
+        }
+
+            .title h2 {
+                margin: 0;
+                letter-spacing: 5px;
+                font-weight: 500;
+            }
+
+        .form-item {
+            margin-bottom: 15px;
+        }
+
+            .form-item label {
+                display: block;
+                font-size: 13px;
+                color: #777;
+                margin-bottom: 5px;
+            }
+
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 2px;
+            box-sizing: border-box;
+            background: #fafafa;
+            outline: none;
+        }
+
+            input:focus {
+                border-color: var(--primary);
+                background: #fff;
+            }
+
+        .row {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-vcode {
+            width: 130px;
+            background: #6d4c41;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+            .btn-vcode:disabled {
+                background: #ccc;
+            }
+
+        .btn-reg {
+            width: 100%;
+            padding: 12px;
+            background: var(--primary);
+            color: #fff;
+            border: none;
+            font-size: 16px;
+            margin-top: 20px;
+            cursor: pointer;
+            transition: 0.3s;
+            letter-spacing: 3px;
+        }
+
+            .btn-reg:hover {
+                background: var(--accent);
+            }
+
+        .error-msg {
+            color: var(--accent);
+            font-size: 12px;
+            margin-top: 4px;
+            display: none;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 13px;
+            color: #888;
+        }
+
+            .footer a {
+                color: var(--primary);
+                text-decoration: none;
+            }
+    </style>
+</head>
+
+<body>
+
+    <div class="reg-card">
+        <div class="title">
+            <h2>建立宗亲档案</h2>
+        </div>
+
+        <div class="form-item">
+            <label>宗亲名号</label>
+            <input type="text" id="username" placeholder="建议使用真实姓名或堂号">
+        </div>
+
+        <div class="form-item">
+            <label>联系手机</label>
+            <input type="tel" id="phone" placeholder="用于家族紧急通知">
+        </div>
+
+        <div class="form-item">
+            <label>电子邮箱</label>
+            <input type="email" id="email" placeholder="接收验证码">
+        </div>
+
+        <div class="form-item">
+            <label>身份验证</label>
+            <div class="row">
+                <input type="text" id="vcode" placeholder="6位数字">
+                <button class="btn-vcode" id="sendBtn" onclick="sendCode()">获取验证码</button>
+            </div>
+        </div>
+
+        <div class="form-item">
+            <label>设置密码</label>
+            <input type="password" id="password" placeholder="请输入8位以上密码">
+        </div>
+
+        <div class="form-item">
+            <label>确认密码</label>
+            <input type="password" id="confirmPassword" placeholder="请再次输入密码">
+            <div id="pwdError" class="error-msg">两次输入的密码不一致</div>
+        </div>
+
+        <button class="btn-reg" id="regBtn" onclick="register()">录入宗谱</button>
+
+        <div class="footer">
+            已有档案？<a href="/login.html">前往登录</a>
+        </div>
+    </div>
+
+    <script>
+        async function sendCode() {
+            const email = document.getElementById('email').value;
+            if (!email) return alert("请先填写邮箱");
+
+            const btn = document.getElementById('sendBtn');
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/api/account/send-code', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(email)
+                });
+                if (res.ok) {
+                    alert("验证码已发出");
+                    let time = 60;
+                    const timer = setInterval(() => {
+                        btn.innerText = `${--time}s`;
+                        if (time <= 0) { clearInterval(timer); btn.disabled = false; btn.innerText = "重新获取"; }
+                    }, 1000);
+                } else {
+                    btn.disabled = false;
+                    alert("发送失败，请检查邮箱格式");
+                }
+            } catch (e) { alert("网络连接错误"); btn.disabled = false; }
+        }
+
+        async function register() {
+            const pwd = document.getElementById('password').value;
+            const confirmPwd = document.getElementById('confirmPassword').value;
+            const pwdError = document.getElementById('pwdError');
+
+            // 1. 前端校验：两次密码是否一致
+            if (pwd !== confirmPwd) {
+                pwdError.style.display = 'block';
+                return;
+            } else {
+                pwdError.style.display = 'none';
+            }
+
+            const data = {
+                username: document.getElementById('username').value,
+                phone: document.getElementById('phone').value,
+                email: document.getElementById('email').value,
+                password: pwd
+            };
+            const code = document.getElementById('vcode').value;
+
+            const regBtn = document.getElementById('regBtn');
+            regBtn.disabled = true;
+            regBtn.innerText = "正在提交...";
+
+            try {
+                const res = await fetch(`/api/account/register?code=${code}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (res.ok) {
+                    alert("注册成功！");
+                    window.location.href = "/login.html";
+                } else {
+                    const err = await res.json();
+                    alert("注册失败：" + (err.message || "信息有误"));
+                    regBtn.disabled = false;
+                    regBtn.innerText = "录入宗谱";
+                }
+            } catch (e) { alert("系统繁忙"); regBtn.disabled = false; }
+        }
+    </script>
+
+</body>
+
+</html>

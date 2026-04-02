@@ -1,0 +1,225 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <title>宗务审核中心 - 赵氏家谱</title>
+    <style>
+        :root {
+            --primary: #8b4513;
+            --bg: #fdfaf2;
+            --accent: #e0d5c1;
+        }
+
+        body {
+            background: var(--bg);
+            font-family: "Microsoft YaHei", serif;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        h2 {
+            color: var(--primary);
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 10px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th {
+            background: var(--accent);
+            color: var(--primary);
+            padding: 12px;
+            text-align: left;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+            font-size: 14px;
+        }
+
+        tr:hover {
+            background: #f9f6f0;
+        }
+
+        .badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        .badge-1 {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        /* 认领 */
+        .badge-2 {
+            background: #f3e5f5;
+            color: #7b1fa2;
+        }
+
+        /* 权限 */
+
+        .btn-group button {
+            margin-right: 5px;
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .btn-approve {
+            background: #2e7d32;
+            color: white;
+        }
+
+        .btn-reject {
+            background: #d32f2f;
+            color: white;
+        }
+
+        /* 弹窗样式 */
+        #modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            border: 2px solid var(--primary);
+            z-index: 100;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .mask {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 99;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <h2>待办宗务审核</h2>
+        <table id="auditTable">
+            <thead>
+                <tr>
+                    <th>申请人</th>
+                    <th>类别</th>
+                    <th>申请理由</th>
+                    <th>提交时间</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody id="auditList">
+            </tbody>
+        </table>
+    </div>
+
+    <div class="mask" id="mask"></div>
+    <div id="modal">
+        <h3 id="modalTitle">处理申请</h3>
+        <textarea id="auditRemark" rows="4" style="width:100%" placeholder="请输入审批备注..."></textarea>
+        <div style="margin-top:15px; text-align:right;">
+            <button onclick="closeModal()">取消</button>
+            <button id="confirmBtn" style="background:var(--primary); color:white; padding:5px 15px;">确认提交</button>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('token');
+        let currentId = null;
+        let currentAction = null;
+
+        window.onload = loadAudits;
+
+        async function loadAudits() {
+            const res = await fetch('/api/audit/pending-list', {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            if (!res.ok) { alert("权限不足或登录过期"); return; }
+
+            const list = await res.json();
+            const tbody = document.getElementById('auditList');
+            tbody.innerHTML = list.map(item => `
+            <tr>
+                <td>${item.applicantId}</td>
+                <td><span class="badge badge-${item.category}">${getCategoryName(item.category)}</span></td>
+                <td>${item.reason || '无'}</td>
+                <td>${new Date(item.createdAt).toLocaleString()}</td>
+                <td class="btn-group">
+                    <button class="btn-approve" onclick="openModal('${item.id}', 1)">通过</button>
+                    <button class="btn-reject" onclick="openModal('${item.id}', 2)">驳回</button>
+                </td>
+            </tr>
+        `).join('');
+        }
+
+        function getCategoryName(cat) {
+            return cat === 1 ? "身份认领" : cat === 2 ? "权限晋升" : "资料修改";
+        }
+
+        function openModal(id, action) {
+            currentId = id;
+            currentAction = action;
+            document.getElementById('modalTitle').innerText = action === 1 ? "确认核准通过？" : "确认驳回申请？";
+            document.getElementById('mask').style.display = 'block';
+            document.getElementById('modal').style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('mask').style.display = 'none';
+            document.getElementById('modal').style.display = 'none';
+            document.getElementById('auditRemark').value = "";
+        }
+
+        document.getElementById('confirmBtn').onclick = async () => {
+            const remark = document.getElementById('auditRemark').value;
+            const res = await fetch('/api/audit/handle', {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    requestId: currentId,
+                    action: currentAction,
+                    auditRemark: remark
+                })
+            });
+
+            if (res.ok) {
+                alert("处理成功！管理员已收到邮件通知。");
+                closeModal();
+                loadAudits();
+            } else {
+                alert("操作失败");
+            }
+        };
+    </script>
+
+</body>
+
+</html>

@@ -1,0 +1,115 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <title>赵氏家谱 - 宗亲登录</title>
+    <style>
+        /* 复用注册页面的古风 CSS，略... */
+        :root {
+            --primary: #8b4513;
+            --bg: #fdfaf2;
+        }
+
+        body {
+            background: var(--bg);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            font-family: "Microsoft YaHei";
+        }
+
+        .login-card {
+            background: #fff;
+            width: 350px;
+            padding: 40px;
+            border: 1px solid #e0d5c1;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        }
+
+        .title {
+            text-align: center;
+            color: var(--primary);
+            margin-bottom: 25px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            box-sizing: border-box;
+        }
+
+        .btn-login {
+            width: 100%;
+            padding: 12px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            letter-spacing: 5px;
+        }
+
+        .links {
+            text-align: center;
+            margin-top: 15px;
+            font-size: 13px;
+            color: #888;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="login-card">
+        <div class="title">
+            <h2>宗亲登录</h2>
+        </div>
+        <input type="text" id="username" placeholder="请输入名号/用户名">
+        <input type="password" id="password" placeholder="请输入密码">
+        <button class="btn-login" onclick="handleLogin()">登录</button>
+        <div class="links">
+            新成员？<a href="/register.html" style="color:var(--primary)">点此入谱</a>
+        </div>
+    </div>
+
+    <script>
+        async function handleLogin() {
+            const payload = {
+                username: document.querySelector('#username').value,
+                password: document.querySelector('#password').value
+            };
+
+            try {
+                const res = await fetch('/api/account/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await res.json();
+
+                if (res.ok) {
+                    // 1. 将 Token 存入本地存储
+                    localStorage.setItem('token', result.token);
+                    alert("登录成功，正在进入族谱...");
+                    // 2. 跳转到主页 (如 index.html)
+                    window.location.href = "/index.html";
+                } else {
+                    alert("登录失败：" + result.message);
+                }
+            } catch (e) {
+                alert("网络故障");
+            }
+        }
+    </script>
+
+</body>
+
+</html>

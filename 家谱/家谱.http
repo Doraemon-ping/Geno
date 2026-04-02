@@ -1,0 +1,6 @@
+@家谱_HostAddress = http://localhost:5171
+
+GET {{家谱_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

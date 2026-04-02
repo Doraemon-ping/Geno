@@ -1,0 +1,279 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <title>宗亲档案管理 - 赵氏家谱</title>
+    <style>
+        :root {
+            --primary: #8b4513;
+            --secondary: #d2b48c;
+            --bg: #fdfaf2;
+            --success: #2e7d32;
+        }
+
+        body {
+            background: var(--bg);
+            font-family: "Microsoft YaHei", serif;
+            display: flex;
+            justify-content: center;
+            padding: 40px 20px;
+        }
+
+        .card {
+            background: #fff;
+            width: 100%;
+            max-width: 500px;
+            padding: 30px;
+            border: 1px solid #e0d5c1;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            border-radius: 8px;
+        }
+
+        .header {
+            border-bottom: 2px solid var(--primary);
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* 表单样式 */
+        .info-group {
+            margin-bottom: 18px;
+        }
+
+        .label {
+            font-size: 14px;
+            color: #999;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        .value-text {
+            font-size: 17px;
+            color: #333;
+            padding: 8px 0;
+            border-bottom: 1px solid transparent;
+        }
+
+        .input-edit {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            box-sizing: border-box;
+            display: none;
+            /* 默认隐藏输入框 */
+        }
+
+        /* 按钮样式 */
+        .btn-group {
+            margin-top: 30px;
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            cursor: pointer;
+            border: none;
+            border-radius: 4px;
+            transition: 0.2s;
+            font-size: 14px;
+            padding: 8px 16px;
+        }
+
+        .btn-edit {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-save {
+            background: var(--success);
+            color: white;
+            display: none;
+        }
+
+        .btn-cancel {
+            background: #eee;
+            color: #666;
+            display: none;
+        }
+
+        .btn-logout {
+            background: #f44336;
+            color: white;
+            opacity: 0.8;
+        }
+
+        button:hover {
+            opacity: 1;
+            transform: translateY(-1px);
+        }
+
+        .status-tag {
+            background: #f0ebe0;
+            color: var(--primary);
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+        }
+
+        .loading-mask {
+            text-align: center;
+            color: var(--primary);
+            padding: 50px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="card" id="profileApp" style="display: none;">
+        <div class="header">
+            <h2 style="color: var(--primary); margin: 0;">宗亲个人档案</h2>
+            <button class="btn-logout" onclick="logout()">退出登录</button>
+        </div>
+
+        <div class="info-group">
+            <div class="label">宗亲名号 (Username)</div>
+            <div id="view-username" class="value-text"></div>
+            <input type="text" id="edit-username" class="input-edit">
+        </div>
+
+        <div class="info-group">
+            <div class="label">联系手机 (Phone)</div>
+            <div id="view-phone" class="value-text"></div>
+            <input type="tel" id="edit-phone" class="input-edit" placeholder="请输入手机号">
+        </div>
+
+        <div class="info-group">
+            <div class="label">电子邮箱 (Email)</div>
+            <div id="view-email" class="value-text"></div>
+            <input type="email" id="edit-email" class="input-edit" placeholder="请输入邮箱">
+        </div>
+
+        <div class="info-group">
+            <div class="label">家族身份</div>
+            <div id="view-role"></div>
+        </div>
+
+        <div class="btn-group">
+            <button id="btn-edit-toggle" class="btn-edit" onclick="toggleEdit(true)">编辑资料</button>
+            <button id="btn-save" class="btn-save" onclick="saveProfile()">保存更改</button>
+            <button id="btn-cancel" class="btn-cancel" onclick="toggleEdit(false)">取消</button>
+        </div>
+    </div>
+
+    <div id="loading" class="loading-mask">正在寻根溯源，请稍候...</div>
+
+    <script>
+        const token = localStorage.getItem('token');
+
+        window.onload = async function () {
+            if (!token) {
+                alert("请先登录系统");
+                window.location.href = "/login.html";
+                return;
+            }
+            await loadProfile();
+        };
+
+        // 1. 获取资料
+        async function loadProfile() {
+            try {
+                const res = await fetch('/api/account/profile', {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+
+                if (res.ok) {
+                    const user = await res.json();
+                    fillData(user);
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('profileApp').style.display = 'block';
+                } else {
+                    handleAuthError(res.status);
+                }
+            } catch (err) {
+                alert("连接服务器失败");
+            }
+        }
+
+        // 将数据填充到页面
+        function fillData(user) {
+            // 显示文本
+            document.getElementById('view-username').innerText = user.username;
+            document.getElementById('view-phone').innerText = user.phone || "未填写";
+            document.getElementById('view-email').innerText = user.email || "未填写";
+
+            const roles = { 1: "族长", 2: "管理员", 3: "族众" };
+            document.getElementById('view-role').innerHTML = `<span class="status-tag">${roles[user.roleType] || "普通成员"}</span>`;
+
+            // 填充输入框备用
+            document.getElementById('edit-username').value = user.username;
+            document.getElementById('edit-phone').value = user.phone || "";
+            document.getElementById('edit-email').value = user.email || "";
+        }
+
+        // 2. 切换编辑模式
+        function toggleEdit(isEdit) {
+            const views = document.querySelectorAll('.value-text');
+            const inputs = document.querySelectorAll('.input-edit');
+
+            views.forEach(v => v.style.display = isEdit ? 'none' : 'block');
+            inputs.forEach(i => i.style.display = isEdit ? 'block' : 'none');
+
+            document.getElementById('btn-edit-toggle').style.display = isEdit ? 'none' : 'block';
+            document.getElementById('btn-save').style.display = isEdit ? 'block' : 'none';
+            document.getElementById('btn-cancel').style.display = isEdit ? 'block' : 'none';
+        }
+
+        // 3. 提交修改
+        async function saveProfile() {
+            const updateData = {
+                username: document.getElementById('edit-username').value,
+                phone: document.getElementById('edit-phone').value,
+                email: document.getElementById('edit-email').value
+            };
+
+            try {
+                const res = await fetch('/api/account/update-profile', {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': 'Bearer ' + token,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(updateData)
+                });
+
+                if (res.ok) {
+                    alert("资料更新成功！");
+                    toggleEdit(false);
+                    await loadProfile(); // 重新加载最新数据
+                } else {
+                    const err = await res.json();
+                    alert("更新失败: " + (err.message || "未知错误"));
+                }
+            } catch (err) {
+                alert("网络异常，请重试");
+            }
+        }
+
+        function handleAuthError(status) {
+            if (status === 401) {
+                alert("身份已过期，请重新登录");
+                logout();
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('token');
+            window.location.href = "/login.html";
+        }
+    </script>
+
+</body>
+
+</html>
