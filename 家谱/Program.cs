@@ -32,6 +32,8 @@ builder.Services.AddMemoryCache();
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("JwtSettings"));
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IAuditService, AuditService>();
+builder.Services.AddScoped<IGenoPoemService, GenoPoemService>();
+builder.Services.AddScoped<IGenoTreeService, GenoTreeService>();
 
 // ∞Û∂®≈‰÷√
 builder.Services.Configure<MailSettings>(builder.Configuration.GetSection("MailSettings"));

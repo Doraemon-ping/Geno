@@ -10,7 +10,7 @@ namespace 家谱.Models.DTOs
         public string Username { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "密码是必填项")]
-        [MinLength(8, ErrorMessage = "为了家族安全，密码至少需要8位")]
+        [MinLength(1, ErrorMessage = "密码不能为空")]
         public string Password { get; set; } = string.Empty;
 
         [EmailAddress(ErrorMessage = "邮箱格式不正确")]

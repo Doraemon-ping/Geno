@@ -1,78 +1,78 @@
 ﻿<!DOCTYPE html>
 <html lang="zh-CN">
-
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>加入宗亲 - 赵氏家谱</title>
+    <title>申请入谱 - 赵氏家谱平台</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <style>
+        /* 保持之前的古风现代化 CSS 样式不变 */
         :root {
             --primary: #8b4513;
-            --accent: #b22222;
             --bg: #fdfaf2;
+            --glass: rgba(255, 255, 255, 0.9);
+        }
+
+        * {
+            box-sizing: border-box;
         }
 
         body {
-            background: var(--bg);
-            font-family: "Microsoft YaHei", serif;
             margin: 0;
+            height: 100vh;
             display: flex;
-            justify-content: center;
             align-items: center;
-            min-height: 100vh;
+            justify-content: center;
+            font-family: 'Noto Serif SC', serif;
+            background: url('https://images.unsplash.com/photo-1578330132821-4912f71120c4?q=80&w=2000') center/cover;
         }
 
-        .reg-card {
-            background: #fff;
-            width: 400px;
-            padding: 40px;
-            border: 1px solid #e0d5c1;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+        .overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.4);
+            z-index: 1;
+        }
+
+        .card {
             position: relative;
+            z-index: 10;
+            width: 440px;
+            padding: 45px;
+            background: var(--glass);
+            backdrop-filter: blur(10px);
+            border-radius: 4px;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.3);
         }
 
-            .reg-card::after {
-                content: "";
-                position: absolute;
-                top: 5px;
-                left: 5px;
-                right: 5px;
-                bottom: 5px;
-                border: 1px solid #f0e6d2;
-                pointer-events: none;
-            }
-
-        .title {
+        h2 {
             text-align: center;
             color: var(--primary);
+            letter-spacing: 6px;
             margin-bottom: 30px;
         }
 
-            .title h2 {
-                margin: 0;
-                letter-spacing: 5px;
-                font-weight: 500;
-            }
-
-        .form-item {
-            margin-bottom: 15px;
+        .form-group {
+            margin-bottom: 18px;
         }
 
-            .form-item label {
+            .form-group label {
                 display: block;
-                font-size: 13px;
-                color: #777;
-                margin-bottom: 5px;
+                font-size: 12px;
+                color: #888;
+                margin-bottom: 6px;
+                font-weight: bold;
             }
 
         input {
             width: 100%;
-            padding: 10px;
-            border: 1px solid #ddd;
+            padding: 12px;
+            border: 1px solid rgba(139,69,19,0.2);
             border-radius: 2px;
-            box-sizing: border-box;
-            background: #fafafa;
             outline: none;
+            background: rgba(255,255,255,0.7);
+            transition: 0.3s;
         }
 
             input:focus {
@@ -80,183 +80,172 @@
                 background: #fff;
             }
 
-        .row {
+        .code-wrap {
             display: flex;
             gap: 10px;
         }
 
-        .btn-vcode {
-            width: 130px;
-            background: #6d4c41;
-            color: #fff;
-            border: none;
+        .btn-code {
+            padding: 0 15px;
+            background: transparent;
+            border: 1px solid var(--primary);
+            color: var(--primary);
             cursor: pointer;
             font-size: 12px;
+            white-space: nowrap;
         }
 
-            .btn-vcode:disabled {
-                background: #ccc;
+            .btn-code:disabled {
+                color: #ccc;
+                border-color: #ccc;
             }
 
         .btn-reg {
             width: 100%;
-            padding: 12px;
+            padding: 15px;
             background: var(--primary);
-            color: #fff;
+            color: white;
             border: none;
-            font-size: 16px;
-            margin-top: 20px;
             cursor: pointer;
+            font-size: 16px;
+            letter-spacing: 8px;
+            font-weight: bold;
+            margin-top: 10px;
             transition: 0.3s;
-            letter-spacing: 3px;
         }
 
-            .btn-reg:hover {
-                background: var(--accent);
-            }
-
-        .error-msg {
-            color: var(--accent);
-            font-size: 12px;
-            margin-top: 4px;
-            display: none;
-        }
-
-        .footer {
-            text-align: center;
-            margin-top: 20px;
+        #msg-box {
+            padding: 10px;
             font-size: 13px;
-            color: #888;
+            margin-bottom: 15px;
+            border-radius: 2px;
+            display: none;
+            text-align: center;
         }
-
-            .footer a {
-                color: var(--primary);
-                text-decoration: none;
-            }
     </style>
 </head>
-
 <body>
 
-    <div class="reg-card">
-        <div class="title">
-            <h2>建立宗亲档案</h2>
-        </div>
+    <div class="overlay"></div>
+    <div class="card">
+        <h2>登名入谱</h2>
+        <div id="msg-box"></div>
 
-        <div class="form-item">
-            <label>宗亲名号</label>
-            <input type="text" id="username" placeholder="建议使用真实姓名或堂号">
-        </div>
-
-        <div class="form-item">
-            <label>联系手机</label>
-            <input type="tel" id="phone" placeholder="用于家族紧急通知">
-        </div>
-
-        <div class="form-item">
-            <label>电子邮箱</label>
-            <input type="email" id="email" placeholder="接收验证码">
-        </div>
-
-        <div class="form-item">
-            <label>身份验证</label>
-            <div class="row">
-                <input type="text" id="vcode" placeholder="6位数字">
-                <button class="btn-vcode" id="sendBtn" onclick="sendCode()">获取验证码</button>
+        <form id="regForm" onsubmit="handleRegister(event)">
+            <div class="form-group">
+                <label>宗亲名号 (用户名)</label>
+                <input type="text" id="username" placeholder="建议使用真实姓名或雅号" required>
             </div>
-        </div>
 
-        <div class="form-item">
-            <label>设置密码</label>
-            <input type="password" id="password" placeholder="请输入8位以上密码">
-        </div>
+            <div class="form-group">
+                <label>联络邮箱</label>
+                <input type="email" id="email" placeholder="用于身份核验" required>
+            </div>
 
-        <div class="form-item">
-            <label>确认密码</label>
-            <input type="password" id="confirmPassword" placeholder="请再次输入密码">
-            <div id="pwdError" class="error-msg">两次输入的密码不一致</div>
-        </div>
+            <div class="form-group">
+                <label>身份验证码</label>
+                <div class="code-wrap">
+                    <input type="text" id="code" placeholder="邮件验证码" required>
+                    <button type="button" class="btn-code" id="sendBtn" onclick="sendCode()">获取验证码</button>
+                </div>
+            </div>
 
-        <button class="btn-reg" id="regBtn" onclick="register()">录入宗谱</button>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                <div class="form-group">
+                    <label>入门凭证 (密码)</label>
+                    <input type="password" id="password" required>
+                </div>
+                <div class="form-group">
+                    <label>确认凭证</label>
+                    <input type="password" id="confirmPassword" required>
+                </div>
+            </div>
 
-        <div class="footer">
-            已有档案？<a href="/login.html">前往登录</a>
+            <div class="form-group">
+                <label>联络手机 (可选)</label>
+                <input type="text" id="phone" placeholder="选填">
+            </div>
+
+            <button type="submit" class="btn-reg">提交申请</button>
+        </form>
+
+        <div style="margin-top: 25px; text-align: center; font-size: 13px;">
+            已有功名？<a href="login.html" style="color: var(--primary); font-weight: bold; text-decoration: none;">直接登录</a>
         </div>
     </div>
 
     <script>
+        const api = axios.create({ baseURL: '/api/Account' });
+
+        // 发送验证码 (FromBody 字符串形式)
         async function sendCode() {
             const email = document.getElementById('email').value;
-            if (!email) return alert("请先填写邮箱");
+            if (!email) return showMsg("请先填写邮箱", true);
 
-            const btn = document.getElementById('sendBtn');
-            btn.disabled = true;
-
+            const sendBtn = document.getElementById('sendBtn');
             try {
-                const res = await fetch('/api/account/send-code', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(email)
+                await api.post('/send-code', `"${email}"`, {
+                    headers: { 'Content-Type': 'application/json' }
                 });
-                if (res.ok) {
-                    alert("验证码已发出");
-                    let time = 60;
-                    const timer = setInterval(() => {
-                        btn.innerText = `${--time}s`;
-                        if (time <= 0) { clearInterval(timer); btn.disabled = false; btn.innerText = "重新获取"; }
-                    }, 1000);
-                } else {
-                    btn.disabled = false;
-                    alert("发送失败，请检查邮箱格式");
-                }
-            } catch (e) { alert("网络连接错误"); btn.disabled = false; }
+                showMsg("验证码已发出，请查收邮件", false);
+
+                let count = 60;
+                sendBtn.disabled = true;
+                const timer = setInterval(() => {
+                    sendBtn.innerText = `${count--}s`;
+                    if (count < 0) {
+                        clearInterval(timer);
+                        sendBtn.disabled = false;
+                        sendBtn.innerText = "重新获取";
+                    }
+                }, 1000);
+            } catch (e) {
+                showMsg("发送失败，请检查邮箱地址", true);
+            }
         }
 
-        async function register() {
-            const pwd = document.getElementById('password').value;
-            const confirmPwd = document.getElementById('confirmPassword').value;
-            const pwdError = document.getElementById('pwdError');
+        // 注册提交: 混合 Body 和 Query 参数
+        async function handleRegister(event) {
+            event.preventDefault();
 
-            // 1. 前端校验：两次密码是否一致
-            if (pwd !== confirmPwd) {
-                pwdError.style.display = 'block';
-                return;
-            } else {
-                pwdError.style.display = 'none';
-            }
+            const password = document.getElementById('password').value;
+            const confirm = document.getElementById('confirmPassword').value;
+            const code = document.getElementById('code').value;
 
-            const data = {
+           
+
+            if (password !== confirm) return showMsg("两次输入的凭证不一致", true);
+
+            // 对应 UserRegisterDto (Body)
+            const bodyPayload = {
                 username: document.getElementById('username').value,
-                phone: document.getElementById('phone').value,
+                password: password,
                 email: document.getElementById('email').value,
-                password: pwd
+                phone: document.getElementById('phone').value
             };
-            const code = document.getElementById('vcode').value;
-
-            const regBtn = document.getElementById('regBtn');
-            regBtn.disabled = true;
-            regBtn.innerText = "正在提交...";
 
             try {
-                const res = await fetch(`/api/account/register?code=${code}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
+                // Axios 会自动将 params 拼接到 URL 后面: /api/Account/register?code=xxxx
+                await api.post('/register', bodyPayload, {
+                    params: { code: code }
                 });
 
-                if (res.ok) {
-                    alert("注册成功！");
-                    window.location.href = "/login.html";
-                } else {
-                    const err = await res.json();
-                    alert("注册失败：" + (err.message || "信息有误"));
-                    regBtn.disabled = false;
-                    regBtn.innerText = "录入宗谱";
-                }
-            } catch (e) { alert("系统繁忙"); regBtn.disabled = false; }
+                alert("申请成功，欢迎归宗！");
+                window.location.href = "login.html";
+            } catch (e) {
+                const errorInfo = e.response || "注册失败，验证码错误或已失效";
+                showMsg(errorInfo, true);
+            }
+        }
+
+        function showMsg(text, isError) {
+            const box = document.getElementById('msg-box');
+            box.innerText = text;
+            box.style.display = 'block';
+            box.style.backgroundColor = isError ? '#fff2f0' : '#f6ffed';
+            box.style.color = isError ? '#ff4d4f' : '#52c41a';
+            box.style.border = `1px solid ${isError ? '#ffccc7' : '#b7eb8f'}`;
         }
     </script>
-
 </body>
-
 </html>

@@ -1,279 +1,478 @@
 ﻿<!DOCTYPE html>
 <html lang="zh-CN">
-
 <head>
     <meta charset="UTF-8">
-    <title>宗亲档案管理 - 赵氏家谱</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>个人中心 - 赵氏宗亲数字化平台</title>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root {
             --primary: #8b4513;
-            --secondary: #d2b48c;
-            --bg: #fdfaf2;
-            --success: #2e7d32;
+            --primary-light: #fdfaf2;
+            --accent: #d2691e;
+            --danger: #ff4d4f;
+            --shadow: 0 10px 30px rgba(0,0,0,0.05);
         }
 
         body {
-            background: var(--bg);
-            font-family: "Microsoft YaHei", serif;
-            display: flex;
-            justify-content: center;
-            padding: 40px 20px;
+            margin: 0;
+            font-family: "Noto Serif SC", serif;
+            background: var(--primary-light);
+            padding-top: 100px;
+            color: #333;
+            line-height: 1.6;
         }
 
+        /* 导航栏 */
+        .navbar {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            height: 80px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 5%;
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(139,69,19,0.1);
+            z-index: 1000;
+            box-sizing: border-box;
+        }
+
+        .logo {
+            font-size: 24px;
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: bold;
+            letter-spacing: 2px;
+        }
+
+        .nav-links a {
+            text-decoration: none;
+            color: #666;
+            margin-left: 25px;
+            transition: 0.3s;
+            font-size: 15px;
+        }
+
+            .nav-links a.active {
+                color: var(--primary);
+                font-weight: bold;
+            }
+
+        /* 布局容器 */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 30px;
+        }
+
+        /* 卡片通用样式 */
         .card {
             background: #fff;
-            width: 100%;
-            max-width: 500px;
+            border-radius: 12px;
+            box-shadow: var(--shadow);
             padding: 30px;
-            border: 1px solid #e0d5c1;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
-            border-radius: 8px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(0,0,0,0.02);
         }
 
-        .header {
-            border-bottom: 2px solid var(--primary);
+        .section-title {
+            font-size: 20px;
+            color: var(--primary);
             margin-bottom: 25px;
             padding-bottom: 15px;
+            border-bottom: 2px solid var(--primary-light);
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
 
         /* 表单样式 */
-        .info-group {
-            margin-bottom: 18px;
+        .form-group {
+            margin-bottom: 20px;
         }
 
-        .label {
-            font-size: 14px;
-            color: #999;
-            margin-bottom: 5px;
-            font-weight: bold;
-        }
+            .form-group label {
+                display: block;
+                font-size: 13px;
+                color: #888;
+                margin-bottom: 8px;
+            }
 
-        .value-text {
-            font-size: 17px;
-            color: #333;
-            padding: 8px 0;
-            border-bottom: 1px solid transparent;
-        }
-
-        .input-edit {
+        input {
             width: 100%;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 16px;
+            padding: 12px 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
             box-sizing: border-box;
-            display: none;
-            /* 默认隐藏输入框 */
+            font-family: inherit;
+            transition: 0.3s;
         }
 
-        /* 按钮样式 */
-        .btn-group {
-            margin-top: 30px;
-            display: flex;
-            gap: 10px;
-        }
+            input:focus {
+                outline: none;
+                border-color: var(--primary);
+                box-shadow: 0 0 0 3px rgba(139,69,19,0.1);
+            }
 
-        button {
+        /* 按钮 */
+        .btn {
+            padding: 12px 24px;
+            border-radius: 6px;
             cursor: pointer;
             border: none;
-            border-radius: 4px;
-            transition: 0.2s;
-            font-size: 14px;
-            padding: 8px 16px;
+            font-family: inherit;
+            font-weight: bold;
+            transition: 0.3s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
         }
 
-        .btn-edit {
+        .btn-primary {
             background: var(--primary);
             color: white;
         }
 
-        .btn-save {
-            background: var(--success);
-            color: white;
-            display: none;
-        }
+            .btn-primary:hover {
+                background: var(--accent);
+                transform: translateY(-1px);
+            }
 
-        .btn-cancel {
-            background: #eee;
+        .btn-ghost {
+            background: #f5f5f5;
             color: #666;
-            display: none;
         }
 
-        .btn-logout {
-            background: #f44336;
+        /* 待办列表样式 */
+        .todo-item {
+            padding: 15px;
+            border-bottom: 1px solid #f0f0f0;
+            cursor: pointer;
+            transition: 0.2s;
+            border-left: 3px solid transparent;
+        }
+
+            .todo-item:hover {
+                background: #fffaf5;
+                border-left-color: var(--primary);
+            }
+
+            .todo-item .tag {
+                font-size: 11px;
+                padding: 2px 6px;
+                border-radius: 4px;
+                margin-right: 8px;
+                background: #fff1f0;
+                color: var(--danger);
+                border: 1px solid #ffa39e;
+            }
+
+            .todo-item .time {
+                display: block;
+                font-size: 11px;
+                color: #999;
+                margin-top: 4px;
+            }
+
+        /* 审批大卡片列表 */
+        .audit-card-item {
+            padding: 20px;
+            border: 1px solid #f0f0f0;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.4s ease;
+        }
+
+        .highlight-flash {
+            background-color: #fffbe6 !important;
+            border-color: #ffe58f !important;
+            box-shadow: 0 0 15px rgba(255, 229, 143, 0.6);
+        }
+
+        .todo-count {
+            background: var(--danger);
             color: white;
-            opacity: 0.8;
-        }
-
-        button:hover {
-            opacity: 1;
-            transform: translateY(-1px);
-        }
-
-        .status-tag {
-            background: #f0ebe0;
-            color: var(--primary);
-            padding: 3px 10px;
-            border-radius: 12px;
+            padding: 2px 8px;
+            border-radius: 10px;
             font-size: 12px;
+            margin-left: 8px;
         }
 
-        .loading-mask {
-            text-align: center;
-            color: var(--primary);
-            padding: 50px;
+        @media (max-width: 900px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+
+            .navbar {
+                padding: 0 20px;
+            }
         }
     </style>
 </head>
-
 <body>
 
-    <div class="card" id="profileApp" style="display: none;">
-        <div class="header">
-            <h2 style="color: var(--primary); margin: 0;">宗亲个人档案</h2>
-            <button class="btn-logout" onclick="logout()">退出登录</button>
+    <nav class="navbar">
+        <a href="index.html" class="logo">赵氏宗亲平台</a>
+        <div class="nav-links">
+            <a href="index.html">首页</a>
+            <a href="my-trees.html">我的族谱</a>
+            <a href="profile.html" class="active">个人中心</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="main-content">
+            <div class="card">
+                <div class="section-title">宗亲基本资料</div>
+                <div class="form-group">
+                    <label>宗亲名号 (不可更改)</label>
+                    <input type="text" id="u-name" readonly style="background:#f9f9f9; color:#999">
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+                    <div class="form-group">
+                        <label>联络邮箱</label>
+                        <input type="email" id="u-email">
+                    </div>
+                    <div class="form-group">
+                        <label>手机号码</label>
+                        <input type="tel" id="u-phone">
+                    </div>
+                </div>
+                <div style="margin-top:10px; display:flex; gap:15px;">
+                    <button class="btn btn-primary" onclick="updateProfile()">修订资料</button>
+                    <button class="btn btn-ghost" onclick="applyRole()">申请管理员权限</button>
+                </div>
+            </div>
+
+            <div id="admin-panel" class="card" style="display:none;">
+                <div class="section-title">
+                    <span>族务审批中心</span>
+                    <span id="audit-total-badge" class="todo-count" style="display:none">0</span>
+                </div>
+                <div id="audit-items-detailed">
+                </div>
+            </div>
         </div>
 
-        <div class="info-group">
-            <div class="label">宗亲名号 (Username)</div>
-            <div id="view-username" class="value-text"></div>
-            <input type="text" id="edit-username" class="input-edit">
-        </div>
+        <div class="sidebar">
+            <div class="card" style="border-top: 3px solid var(--primary); padding: 20px;">
+                <div class="section-title" style="font-size: 16px;">
+                    <span>🔔 实时待办</span>
+                    <span id="sidebar-badge" class="todo-count" style="display:none">0</span>
+                </div>
 
-        <div class="info-group">
-            <div class="label">联系手机 (Phone)</div>
-            <div id="view-phone" class="value-text"></div>
-            <input type="tel" id="edit-phone" class="input-edit" placeholder="请输入手机号">
-        </div>
+                <div id="todo-empty-state" style="text-align:center; padding:30px 0;">
+                    <div style="font-size:40px; opacity:0.2;">📜</div>
+                    <p style="color:#999; font-size:13px; margin-top:10px;">海内升平，暂无待办</p>
+                </div>
 
-        <div class="info-group">
-            <div class="label">电子邮箱 (Email)</div>
-            <div id="view-email" class="value-text"></div>
-            <input type="email" id="edit-email" class="input-edit" placeholder="请输入邮箱">
-        </div>
+                <div id="todo-list-sidebar" style="display:none;">
+                </div>
+            </div>
 
-        <div class="info-group">
-            <div class="label">家族身份</div>
-            <div id="view-role"></div>
-        </div>
-
-        <div class="btn-group">
-            <button id="btn-edit-toggle" class="btn-edit" onclick="toggleEdit(true)">编辑资料</button>
-            <button id="btn-save" class="btn-save" onclick="saveProfile()">保存更改</button>
-            <button id="btn-cancel" class="btn-cancel" onclick="toggleEdit(false)">取消</button>
+            <div class="card" style="background: #fffdfa;">
+                <div class="section-title" style="font-size: 16px; color: var(--accent);">🛡️ 账号状态</div>
+                <div style="font-size:13px; color:#888;">
+                    最后更新：<span id="last-check-time">-</span><br>
+                    安全等级：<span style="color:green; font-weight:bold;">高</span>
+                </div>
+                <button class="btn btn-ghost" style="width:100%; margin-top:20px; font-size:13px;" onclick="location.href='index.html'">返回首页</button>
+            </div>
         </div>
     </div>
 
-    <div id="loading" class="loading-mask">正在寻根溯源，请稍候...</div>
-
     <script>
+        // 1. 初始化配置
         const token = localStorage.getItem('token');
+        const api = axios.create({
+            baseURL: '/api',
+            headers: { Authorization: `Bearer ${token}` }
+        });
 
-        window.onload = async function () {
-            if (!token) {
-                alert("请先登录系统");
-                window.location.href = "/login.html";
-                return;
+        // 响应拦截
+        api.interceptors.response.use(
+            r => r,
+            e => {
+                if (e.response && e.response.status === 401) {
+                    alert("登录失效");
+                    window.location.href = 'login.html';
+                }
+                return Promise.reject(e);
             }
-            await loadProfile();
-        };
+        );
 
-        // 1. 获取资料
-        async function loadProfile() {
+        // 2. 页面初始化
+        async function initPage() {
             try {
-                const res = await fetch('/api/account/profile', {
-                    headers: { 'Authorization': 'Bearer ' + token }
-                });
+                // 获取个人资料 (GET /api/Account/profile)
+                const user = await api.get('/Account/profile').then(r => r.data);
 
-                if (res.ok) {
-                    const user = await res.json();
-                    fillData(user);
-                    document.getElementById('loading').style.display = 'none';
-                    document.getElementById('profileApp').style.display = 'block';
-                } else {
-                    handleAuthError(res.status);
+                document.getElementById('u-name').value = user.username;
+                document.getElementById('u-email').value = user.email || '';
+                document.getElementById('u-phone').value = user.phone || '';
+                document.getElementById('last-check-time').innerText = new Date().toLocaleTimeString();
+
+                // 权限控制：假设后端 role <= 2 为管理权限
+                if (true) {
+                    document.getElementById('admin-panel').style.display = 'block';
+                    fetchAuditTasks();
+                    setInterval(fetchAuditTasks, 30000); // 30秒轮询
                 }
             } catch (err) {
-                alert("连接服务器失败");
+                console.error("初始化失败", err);
             }
         }
 
-        // 将数据填充到页面
-        function fillData(user) {
-            // 显示文本
-            document.getElementById('view-username').innerText = user.username;
-            document.getElementById('view-phone').innerText = user.phone || "未填写";
-            document.getElementById('view-email').innerText = user.email || "未填写";
-
-            const roles = { 1: "族长", 2: "管理员", 3: "族众" };
-            document.getElementById('view-role').innerHTML = `<span class="status-tag">${roles[user.roleType] || "普通成员"}</span>`;
-
-            // 填充输入框备用
-            document.getElementById('edit-username').value = user.username;
-            document.getElementById('edit-phone').value = user.phone || "";
-            document.getElementById('edit-email').value = user.email || "";
-        }
-
-        // 2. 切换编辑模式
-        function toggleEdit(isEdit) {
-            const views = document.querySelectorAll('.value-text');
-            const inputs = document.querySelectorAll('.input-edit');
-
-            views.forEach(v => v.style.display = isEdit ? 'none' : 'block');
-            inputs.forEach(i => i.style.display = isEdit ? 'block' : 'none');
-
-            document.getElementById('btn-edit-toggle').style.display = isEdit ? 'none' : 'block';
-            document.getElementById('btn-save').style.display = isEdit ? 'block' : 'none';
-            document.getElementById('btn-cancel').style.display = isEdit ? 'block' : 'none';
-        }
-
-        // 3. 提交修改
-        async function saveProfile() {
-            const updateData = {
-                username: document.getElementById('edit-username').value,
-                phone: document.getElementById('edit-phone').value,
-                email: document.getElementById('edit-email').value
-            };
-
+        // 5. 权限申请 (POST /api/Audit/apply-role)
+        async function applyRole() {
+            const reason = prompt("请说明申请理由（如：负责录入某支脉族谱）：");
+            if (!reason) return;
             try {
-                const res = await fetch('/api/account/update-profile', {
-                    method: 'PUT',
-                    headers: {
-                        'Authorization': 'Bearer ' + token,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(updateData)
+                await api.post('/Audit/apply-role', {
+                    targetRole: 2,
+                    reason: reason
                 });
+                alert("申请已提交，请静候宗亲会审核");
+            } catch (err) {
+                alert("提交失败");
+            }
+        }
 
-                if (res.ok) {
-                    alert("资料更新成功！");
-                    toggleEdit(false);
-                    await loadProfile(); // 重新加载最新数据
+        // 6. 资料修订 (PUT /api/Account/update-profile)
+        async function updateProfile() {
+            try {
+                await api.put('/Account/update-profile', {
+                    username: document.getElementById('u-name').value,
+                    email: document.getElementById('u-email').value,
+                    phone: document.getElementById('u-phone').value
+                });
+                alert("修订成功");
+            } catch (err) {
+                alert("修订失败");
+            }
+        }
+
+        /**
+ * 获取并渲染待审批任务 (基于最新 JSON 结构)
+ */
+        async function fetchAuditTasks() {
+            try {
+                const res = await api.get('/Audit/pending-list');
+                // 注意：如果后端返回的是单个对象而非数组，这里做个兼容处理
+                const data = res.data;
+                const list = Array.isArray(data) ? data : (data ? [data] : []);
+
+                const sBadge = document.getElementById('sidebar-badge');
+                const mBadge = document.getElementById('audit-total-badge');
+                const emptyState = document.getElementById('todo-empty-state');
+                const sidebarList = document.getElementById('todo-list-sidebar');
+                const mainItems = document.getElementById('audit-items-detailed');
+
+                if (list.length > 0) {
+                    // 1. 更新计数器
+                    [sBadge, mBadge].forEach(el => {
+                        if (el) {
+                            el.innerText = list.length;
+                            el.style.display = 'inline-block';
+                        }
+                    });
+
+                    if (emptyState) emptyState.style.display = 'none';
+
+                    // 2. 渲染侧边栏简易项
+                    if (sidebarList) {
+                        sidebarList.style.display = 'block';
+                        sidebarList.innerHTML = list.map(item => `
+                    <div class="todo-item" onclick="focusAuditItem('${item.id}')">
+                        <span class="tag">待审批</span>
+                        <span style="font-size:13px;">${item.reason === 'string' ? '权限变更申请' : (item.reason || '身份申请')}</span>
+                        <span class="time">编号: ${item.id.substring(0, 8)}</span>
+                    </div>
+                `).join('');
+                    }
+
+                    // 3. 渲染主界面详细列表
+                    if (mainItems) {
+                        mainItems.innerHTML = list.map(item => `
+                    <div id="audit-row-${item.id}" class="audit-card-item">
+                        <div style="flex:1">
+                            <div style="font-weight:bold; font-size:15px; color:var(--primary);">
+                                申请人: <span style="color:#666; font-weight:normal;">${item.applicantId.substring(0, 13)}...</span>
+                            </div>
+                            <div style="color:#444; font-size:14px; margin-top:8px;">
+                                <strong>申请事由：</strong>${item.reason === 'string' ? '未详细说明' : item.reason}
+                            </div>
+                            <div style="font-size:12px; color:#999; margin-top:5px;">
+                                提交时间：${new Date(item.createdAt).toLocaleString()}
+                            </div>
+                        </div>
+                        <div style="display:flex; gap:10px;">
+                            <button class="btn btn-primary" style="padding:8px 16px; font-size:12px;" 
+                                    onclick="handleAudit('${item.id}', 1)">准许</button>
+                            <button class="btn" style="padding:8px 16px; font-size:12px; color:var(--danger); border:1px solid #ffccc7;" 
+                                    onclick="handleAudit('${item.id}', 2)">驳回</button>
+                        </div>
+                    </div>
+                `).join('');
+                    }
                 } else {
-                    const err = await res.json();
-                    alert("更新失败: " + (err.message || "未知错误"));
+                    // 无数据时的重置逻辑
+                    [sBadge, mBadge].forEach(el => { if (el) el.style.display = 'none'; });
+                    if (emptyState) emptyState.style.display = 'block';
+                    if (sidebarList) sidebarList.style.display = 'none';
+                    if (mainItems) mainItems.innerHTML = '<p style="text-align:center; color:#999; padding:40px;">暂无待办事务</p>';
                 }
             } catch (err) {
-                alert("网络异常，请重试");
+                console.error("同步待办列表失败:", err);
             }
         }
 
-        function handleAuthError(status) {
-            if (status === 401) {
-                alert("身份已过期，请重新登录");
-                logout();
+        /**
+         * 处理审批 (对接 HandleAuditDto)
+         */
+        async function handleAudit(id, action) {
+            const remark = prompt(action === 1 ? "通过备注（选填）：" : "驳回原因（必填）：");
+            if (action === 2 && !remark) return alert("驳回必须填写理由");
+
+            try {
+                await api.post('/Audit/handle', {
+                    requestId: id,       // 对应后端 HandleAuditDto 中的 requestId
+                    action: action,      // 1:通过, 2:驳回
+                    auditRemark: remark
+                });
+                alert("操作成功，结果已入库");
+                fetchAuditTasks(); // 刷新列表
+            } catch (err) {
+                alert("操作失败: " + (err.response?.data?.title || "接口异常"));
             }
         }
 
-        function logout() {
-            localStorage.removeItem('token');
-            window.location.href = "/login.html";
+        /**
+         * 侧边栏定位跳转
+         */
+        function focusAuditItem(id) {
+            const target = document.getElementById(`audit-row-${id}`);
+            if (target) {
+                target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                target.classList.add('highlight-flash');
+                setTimeout(() => target.classList.remove('highlight-flash'), 2000);
+            }
         }
+
+        
+
+        // 入口执行
+        initPage();
     </script>
-
 </body>
-
 </html>

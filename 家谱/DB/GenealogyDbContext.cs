@@ -25,6 +25,8 @@
 
         public DbSet<GenoGenerationPoem> GenoGenerationPoems { get; set; } = null!;
 
+        public DbSet<GenoTree> GenoTrees { get; set; } = null!;
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -41,6 +43,12 @@
 
                 // 设置默认值（如果数据库没设，EF 也会尝试处理）
                 entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+
+                modelBuilder.Entity<GenoTree>()
+        .HasMany(t => t.Poems)      // 树有多个字辈
+        .WithOne()                  // 字辈对应一个树（这里留空，因为你删了导航属性）
+        .HasForeignKey("TreeID");   // 明确告诉 EF，外键字段名叫 TreeID
+
             });
         }
     }

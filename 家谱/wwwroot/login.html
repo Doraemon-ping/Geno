@@ -1,115 +1,270 @@
 ﻿<!DOCTYPE html>
 <html lang="zh-CN">
-
 <head>
     <meta charset="UTF-8">
-    <title>赵氏家谱 - 宗亲登录</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>赵氏家谱 - 开启族门</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <style>
-        /* 复用注册页面的古风 CSS，略... */
         :root {
-            --primary: #8b4513;
-            --bg: #fdfaf2;
+            --primary: #8b4513; /* 朱砂棕 */
+            --accent: #d2691e;
+            --glass: rgba(255, 255, 255, 0.88);
+            --ink: #2c1e16;
         }
 
-        body {
-            background: var(--bg);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            font-family: "Microsoft YaHei";
-        }
-
-        .login-card {
-            background: #fff;
-            width: 350px;
-            padding: 40px;
-            border: 1px solid #e0d5c1;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
-        }
-
-        .title {
-            text-align: center;
-            color: var(--primary);
-            margin-bottom: 25px;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 10px;
-        }
-
-        input {
-            width: 100%;
-            padding: 12px;
-            margin-bottom: 15px;
-            border: 1px solid #ddd;
+        * {
             box-sizing: border-box;
         }
 
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: 'Noto Serif SC', serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            /* 建议背景图：具有东方神韵的山水或古籍纹理 */
+            background: url('https://images.unsplash.com/photo-1578330132821-4912f71120c4?q=80&w=2000') center/cover no-repeat;
+        }
+
+        /* 黑色半透明蒙版，增强文字可读性 */
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.45);
+            z-index: 1;
+        }
+
+        .login-card {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 420px;
+            padding: 60px 45px;
+            background: var(--glass);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-radius: 4px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.4);
+            border: 1px solid rgba(255,255,255,0.3);
+            text-align: center;
+            animation: fadeIn 0.8s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .title-area h2 {
+            font-size: 32px;
+            color: var(--primary);
+            margin: 0;
+            letter-spacing: 8px;
+            font-weight: 700;
+        }
+
+        .title-area p {
+            font-size: 14px;
+            color: #777;
+            margin: 15px 0 45px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .form-group {
+            position: relative;
+            margin-bottom: 25px;
+            text-align: left;
+        }
+
+            .form-group label {
+                display: block;
+                font-size: 12px;
+                color: #888;
+                margin-bottom: 8px;
+                font-weight: bold;
+                padding-left: 2px;
+            }
+
+            .form-group input {
+                width: 100%;
+                padding: 14px 18px;
+                background: rgba(255,255,255,0.6);
+                border: 1px solid rgba(139, 69, 19, 0.15);
+                border-radius: 2px;
+                font-size: 16px;
+                outline: none;
+                transition: all 0.3s;
+                color: var(--ink);
+            }
+
+                .form-group input:focus {
+                    border-color: var(--primary);
+                    background: #fff;
+                    box-shadow: 0 0 12px rgba(139, 69, 19, 0.1);
+                }
+
+        /* 功能链接区 */
+        .extra-actions {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            font-size: 13px;
+        }
+
+            .extra-actions a {
+                color: #888;
+                text-decoration: none;
+                transition: 0.2s;
+            }
+
+                .extra-actions a:hover {
+                    color: var(--primary);
+                }
+
         .btn-login {
             width: 100%;
-            padding: 12px;
+            padding: 16px;
             background: var(--primary);
             color: white;
             border: none;
-            cursor: pointer;
+            border-radius: 2px;
             font-size: 16px;
-            letter-spacing: 5px;
+            cursor: pointer;
+            transition: 0.3s;
+            letter-spacing: 10px;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(139, 69, 19, 0.2);
         }
 
-        .links {
-            text-align: center;
-            margin-top: 15px;
+            .btn-login:hover {
+                background: var(--accent);
+                transform: translateY(-2px);
+                box-shadow: 0 8px 25px rgba(139, 69, 19, 0.4);
+            }
+
+        .register-tip {
+            margin-top: 35px;
+            font-size: 14px;
+            color: #666;
+        }
+
+            .register-tip a {
+                color: var(--primary);
+                font-weight: bold;
+                text-decoration: none;
+                border-bottom: 1px solid transparent;
+                transition: 0.3s;
+            }
+
+                .register-tip a:hover {
+                    border-bottom-color: var(--primary);
+                }
+
+        /* 错误反馈 */
+        #msg {
+            margin-bottom: 20px;
             font-size: 13px;
-            color: #888;
+            color: #d32f2f;
+            display: none;
         }
     </style>
 </head>
-
 <body>
 
+    <div class="overlay"></div>
+
     <div class="login-card">
-        <div class="title">
-            <h2>宗亲登录</h2>
+        <div class="title-area">
+            <h2>赵氏族门</h2>
+            <p>追本溯源 · 数字化家族平台</p>
         </div>
-        <input type="text" id="username" placeholder="请输入名号/用户名">
-        <input type="password" id="password" placeholder="请输入密码">
-        <button class="btn-login" onclick="handleLogin()">登录</button>
-        <div class="links">
-            新成员？<a href="/register.html" style="color:var(--primary)">点此入谱</a>
+
+        <div id="msg">信息有误，请重新查验</div>
+
+        <form id="loginForm" onsubmit="handleLogin(event)">
+            <div class="form-group">
+                <label>账 号</label>
+                <input type="text" id="username" placeholder="请输入名号" required>
+            </div>
+
+            <div class="form-group">
+                <label>入内凭证 (密码)</label>
+                <input type="password" id="password" placeholder="请输入密码" required>
+            </div>
+
+            <div class="extra-actions">
+                <label style="color:#888; cursor:pointer">
+                    <input type="checkbox" style="width:auto; margin-bottom:0"> 记住我
+                </label>
+                <a href="/forget-password.html">忘记凭证？</a>
+            </div>
+
+            <button type="submit" class="btn-login">开启族谱</button>
+        </form>
+
+        <div class="register-tip">
+            新成员申请入谱？<a href="/register.html">即刻加入</a>
         </div>
     </div>
 
     <script>
-        async function handleLogin() {
+        async function handleLogin(event) {
+            event.preventDefault();
+            const msgEl = document.getElementById('msg');
+            msgEl.style.display = 'none';
+
             const payload = {
                 username: document.querySelector('#username').value,
                 password: document.querySelector('#password').value
             };
 
             try {
-                const res = await fetch('/api/account/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
+                // 使用 axios 更加现代化且易于处理拦截器
+                const res = await axios.post('/api/account/login', payload);
 
-                const result = await res.json();
+                if (res.data.token) {
+                    localStorage.setItem('token', res.data.token);
+                    // 柔和的成功反馈
+                    const btn = document.querySelector('.btn-login');
+                    btn.innerText = "正在入谱...";
+                    btn.style.background = "#2e7d32";
 
-                if (res.ok) {
-                    // 1. 将 Token 存入本地存储
-                    localStorage.setItem('token', result.token);
-                    alert("登录成功，正在进入族谱...");
-                    // 2. 跳转到主页 (如 index.html)
-                    window.location.href = "/index.html";
-                } else {
-                    alert("登录失败：" + result.message);
+                    setTimeout(() => {
+                        window.location.href = "/index.html";
+                    }, 800);
                 }
             } catch (e) {
-                alert("网络故障");
+                msgEl.style.display = 'block';
+                if (e.response && e.response.data) {
+                    msgEl.innerText = "查验失败：" + (e.response.data.message || "凭证不匹配");
+                } else {
+                    msgEl.innerText = "网络阻滞，请稍后再试";
+                }
+            }
+        }
+
+        // 页面初始化：如果已有 Token，尝试自动进入
+        window.onload = () => {
+            if (localStorage.getItem('token')) {
+                // 这里可以先校验一次 token 有效性，或者直接跳转
+                // window.location.href = "/index.html";
             }
         }
     </script>
-
 </body>
-
 </html>

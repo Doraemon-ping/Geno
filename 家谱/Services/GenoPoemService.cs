@@ -7,13 +7,15 @@
 
     public interface IGenoPoemService
     {
+        // 查：获取某棵家谱树的所有字辈，按代数排序
         Task<List<GenoGenerationPoem>> GetByTreeIdAsync(Guid treeId);
 
+        // 查：获取单个字辈详情
         Task<GenoGenerationPoem?> GetByIdAsync(Guid id);
 
         Task<bool> CreateAsync(PoemDto dto);
 
-        Task<bool> UpdateAsync(PoemDto dto);
+        Task<bool> UpdateAsync(PoemDto dto, Guid PoemId);
 
         Task<bool> DeleteAsync(Guid id);
     }
@@ -50,10 +52,11 @@
         {
             var poem = new GenoGenerationPoem
             {
-                TreeID = dto.TreeID,
                 GenerationNum = dto.GenerationNum,
                 Word = dto.Word,
-                Meaning = dto.Meaning
+                Meaning = dto.Meaning,
+                TreeID = dto.TreeId
+
             };
 
             _context.GenoGenerationPoems.Add(poem);
@@ -62,13 +65,10 @@
 
         // 改：修改字辈信息
 
-        public async Task<bool> UpdateAsync(PoemDto dto)
-        {
-            if (!dto.PoemID.HasValue) return false;
-
-            var poem = await _context.GenoGenerationPoems.FindAsync(dto.PoemID.Value);
+        public async Task<bool> UpdateAsync(PoemDto dto, Guid poemId)
+        { 
+            var poem = await _context.GenoGenerationPoems.FindAsync(poemId);    
             if (poem == null) return false;
-
             poem.GenerationNum = dto.GenerationNum;
             poem.Word = dto.Word;
             poem.Meaning = dto.Meaning;

@@ -41,7 +41,7 @@
         {
             context.Response.ContentType = "application/json; charset=utf-8"; // 明确指定 UTF-8
 
-            var response = new ApiResponse
+            var response = new ErrorResponse
             {
                 Code = context.Response.StatusCode,
                 Message = exception.Message

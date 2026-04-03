@@ -1,0 +1,355 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>赵氏宗亲数字化平台 - 传承千载 始于足下</title>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        :root {
+            --primary: #8b4513;
+            --accent: #a0522d;
+            --gold: #d4af37;
+            --paper: #fdfaf2;
+            --glass: rgba(255, 255, 255, 0.85);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: "Noto Serif SC", "楷体", serif;
+            background: var(--paper);
+            color: #333;
+            overflow-x: hidden;
+        }
+
+        /* --- 现代化透明导航 --- */
+        .navbar {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            height: 80px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 5%;
+            background: var(--glass);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(139, 69, 19, 0.1);
+            z-index: 1000;
+        }
+
+        .logo {
+            font-size: 28px;
+            font-weight: bold;
+            color: var(--primary);
+            letter-spacing: 4px;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 30px;
+            align-items: center;
+        }
+
+            .nav-links a {
+                text-decoration: none;
+                color: #555;
+                font-size: 16px;
+                transition: 0.3s;
+                position: relative;
+            }
+
+                .nav-links a:hover {
+                    color: var(--primary);
+                }
+
+                .nav-links a.active::after {
+                    content: '';
+                    position: absolute;
+                    bottom: -5px;
+                    left: 0;
+                    width: 100%;
+                    height: 2px;
+                    background: var(--primary);
+                }
+
+        /* --- Hero Section 门户大图 --- */
+        .hero {
+            height: 60vh;
+            background: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url('https://images.unsplash.com/photo-1599508435850-8f9f75ecf236?q=80&w=2000') center/cover;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            text-align: center;
+            padding-top: 80px;
+        }
+
+            .hero h1 {
+                font-size: 56px;
+                margin: 0;
+                letter-spacing: 10px;
+                text-shadow: 2px 2px 10px rgba(0,0,0,0.5);
+            }
+
+            .hero p {
+                font-size: 20px;
+                opacity: 0.9;
+                margin-top: 15px;
+                font-style: italic;
+            }
+
+        /* --- 核心功能入口 (跳转点) --- */
+        .main-container {
+            max-width: 1200px;
+            margin: -60px auto 50px;
+            padding: 0 20px;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 25px;
+        }
+
+        .feature-card {
+            background: white;
+            padding: 40px 30px;
+            border-radius: 4px;
+            text-align: center;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.05);
+            transition: 0.4s;
+            cursor: pointer;
+            border-top: 4px solid transparent;
+        }
+
+            .feature-card:hover {
+                transform: translateY(-10px);
+                border-top-color: var(--primary);
+            }
+
+            .feature-card i {
+                font-size: 40px;
+                color: var(--primary);
+                margin-bottom: 20px;
+                display: block;
+            }
+
+            .feature-card h3 {
+                margin: 10px 0;
+                color: var(--primary);
+            }
+
+            .feature-card p {
+                font-size: 14px;
+                color: #777;
+                line-height: 1.6;
+            }
+
+        /* --- 公开列表与公告 --- */
+        .content-section {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 40px;
+            margin-top: 50px;
+        }
+
+        .section-box {
+            background: white;
+            padding: 30px;
+            border-radius: 4px;
+        }
+
+        .section-title {
+            font-size: 22px;
+            color: var(--primary);
+            border-left: 5px solid var(--primary);
+            padding-left: 15px;
+            margin-bottom: 25px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .public-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .public-item {
+            padding: 20px;
+            border-bottom: 1px solid #f0f0f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+            .public-item:hover {
+                background: #fafafa;
+            }
+
+        /* --- 页脚 --- */
+        footer {
+            background: #2c1e16;
+            color: rgba(255,255,255,0.6);
+            padding: 50px 0;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        /* 响应式调整 */
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 32px;
+            }
+
+            .content-section {
+                grid-template-columns: 1fr;
+            }
+
+            .navbar {
+                padding: 0 20px;
+            }
+
+            .nav-links {
+                display: none;
+            }
+            /* 移动端可简化 */
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="navbar">
+        <div class="logo">赵氏家谱</div>
+        <div class="nav-links">
+            <a href="index.html" class="active">首页</a>
+            <a href="my-trees.html">我的族谱</a>
+            <a href="public.html">万姓同根</a>
+            <a href="audit.html" id="audit-nav" style="display:none">族务审批</a>
+            <div class="user-profile" style="margin-left:20px; display:flex; align-items:center; gap:10px">
+                <span id="user-name" style="font-weight:bold; color:var(--primary)">载入中...</span>
+                <button onclick="logout()" style="background:none; border:1px solid #ccc; padding:4px 8px; cursor:pointer; font-family:inherit">退出</button>
+            </div>
+        </div>
+    </nav>
+
+    <header class="hero">
+        <h1>敦亲睦族 · 追本溯源</h1>
+        <p>“谱牒身之本也，不识其祖，何以立身？”</p>
+    </header>
+
+    <div class="main-container">
+        <div class="feature-grid">
+            <div class="feature-card" onclick="location.href='my-trees.html'">
+                <i>📜</i>
+                <h3>修订家谱</h3>
+                <p>进入私有空间，录入始祖迁徙、生卒年月及平生功德。</p>
+            </div>
+            <div class="feature-card" onclick="location.href='public.html'">
+                <i>🌍</i>
+                <h3>寻根问祖</h3>
+                <p>浏览全族公开谱系，查看同宗支脉的分布与迁徙路径。</p>
+            </div>
+            <div class="feature-card" onclick="location.href='profile.html'">
+                <i>⛩️</i>
+                <h3>个人中心</h3>
+                <p>完善宗亲资料，申请族中管理权限，接收族务通知。</p>
+            </div>
+        </div>
+
+        <div class="content-section">
+            <div class="section-box">
+                <div class="section-title">
+                    <span>最新公开族谱</span>
+                    <a href="public.html" style="font-size:14px; color:#888; text-decoration:none">查看全部 →</a>
+                </div>
+                <div id="public-trees" class="public-list">
+                    <p style="color:#999">正在翻阅卷宗...</p>
+                </div>
+            </div>
+
+            <div class="section-box" style="background:var(--paper); border:1px solid var(--border)">
+                <div class="section-title">族务公告</div>
+                <div style="font-size:14px; line-height:2">
+                    <p>🚩 <b>2026-04-03</b>：系统支持字辈自动对比功能。</p>
+                    <p>🚩 <b>2026-03-28</b>：汴京赵氏支脉完成数字化入库。</p>
+                </div>
+                <hr style="border:0; border-top:1px dashed var(--primary); margin:20px 0">
+                <div class="section-title">系统诊断</div>
+                <button onclick="diagnose()" class="btn" style="width:100%; padding:10px; background:white; border:1px solid var(--primary); cursor:pointer">运行系统自检</button>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>赵氏宗亲会 版权所有 &copy; 2026</p>
+        <p style="margin-top:10px; opacity:0.5">数字化传承 ｜ 家族文明 ｜ 科技溯源</p>
+    </footer>
+
+    <script>
+        const token = localStorage.getItem('token');
+        if (!token) location.href = 'login.html';
+
+        // 页面初始化
+        window.onload = async () => {
+            await loadProfile();
+            await loadPublicTrees();
+        };
+
+        // 获取个人资料并控制权限 UI
+        async function loadProfile() {
+            try {
+                const res = await axios.get('/api/Account/profile', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const user = res.data;
+                document.getElementById('user-name').innerText = user.username;
+                // 角色逻辑：管理员显示审核入口
+                if (user.role <= 2) document.getElementById('audit-nav').style.display = 'block';
+            } catch (e) {
+                location.href = 'login.html';
+            }
+        }
+
+        // 加载公开族谱列表 (API: /api/GenoTree/GetAll)
+        async function loadPublicTrees() {
+            try {
+                const res = await axios.get('/api/GenoTree/GetAll', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const list = res.data;
+                const container = document.getElementById('public-trees');
+                container.innerHTML = list.slice(0, 5).map(t => `
+                        <div class="public-item">
+                            <div>
+                                <div style="font-weight:bold; color:var(--primary)">${t.treeName}</div>
+                                <div style="font-size:12px; color:#999; margin-top:4px">始祖：${t.ancestorName || '不详'} · 地区：${t.region || '未知'}</div>
+                            </div>
+                            <button onclick="location.href='tree-detail.html?id=${t.treeID}'"
+                                    style="border:none; background:var(--primary); color:white; padding:5px 15px; border-radius:2px; cursor:pointer">
+                                查阅
+                            </button>
+                        </div>
+                    `).join('');
+            } catch (e) {
+                console.error("加载失败");
+            }
+        }
+
+        function diagnose() {
+            axios.get('/api/Test/diagnose-config', { headers: { 'Authorization': `Bearer ${token}` } })
+                .then(r => alert("诊断完成，系统运行正常"));
+        }
+
+        function logout() {
+            localStorage.removeItem('token');
+            location.href = 'login.html';
+        }
+    </script>
+</body>
+</html>

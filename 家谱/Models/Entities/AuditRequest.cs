@@ -1,5 +1,7 @@
 ﻿namespace 家谱.Models.Entities
 {
+    using System.ComponentModel.DataAnnotations.Schema;
+
     public class AuditRequest
     {
         public Guid Id { get; set; } = Guid.NewGuid();
@@ -29,5 +31,16 @@
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         public DateTime? ProcessedAt { get; set; }
+
+        public Guid? ProcessId { get; set; }
+
+        [ForeignKey(nameof(ApplicantId))]
+        public virtual SysUser Applicant { get; set; } = null!;
+
+        [ForeignKey(nameof(ProcessId))]
+        public virtual SysUser Process { get; set; } = null!;
+
+        [ForeignKey(nameof(TargetMemberID))]
+        public virtual GenoMember? TargetMember { get; set; }
     }
 }
