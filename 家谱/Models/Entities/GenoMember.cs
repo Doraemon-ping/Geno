@@ -1,6 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using 家谱.Models.Entities.家谱.Models.Entities;
 
 namespace 家谱.Models.Entities
 {
@@ -70,10 +69,9 @@ namespace 家谱.Models.Entities
         /// <summary>
         /// 软删除标记
         /// </summary>
-        public bool? IsDeleted { get; set; } = false;
+        public bool? IsDel { get; set; } = false;
 
-
-
+        public Guid? SysUserId { get; set; }
     }
 
 

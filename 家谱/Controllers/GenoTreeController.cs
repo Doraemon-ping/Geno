@@ -58,7 +58,7 @@
             //只允许管理员访问公开列表，普通用户无法访问
             // 你现有的 GetAll 是获取所有，通常建议在这里过滤 IsPublic == true
             var trees = await _treeService.GetAll();
-            return Ok(trees);
+            return Ok(trees.Where(t => t.IsPublic));
         }
 
         [HttpGet("Get/{id}")]

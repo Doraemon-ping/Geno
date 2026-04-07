@@ -40,5 +40,7 @@
 
         // 导航属性：一棵树对应多个字辈
         public ICollection<GenoGenerationPoem>? Poems { get; set; }
+
+        public bool IsDel { get; set; } = false;
     }
 }

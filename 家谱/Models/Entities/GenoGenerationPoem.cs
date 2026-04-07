@@ -25,5 +25,7 @@
         public string? Meaning { get; set; }
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+        public bool IsDel { get; set; } = false;
     }
 }

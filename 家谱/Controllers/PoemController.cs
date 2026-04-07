@@ -5,6 +5,8 @@
     using System.Security.Claims;
     using 家谱.Middleware;
     using 家谱.Models.DTOs;
+    using 家谱.Models.DTOs.Common;
+    using 家谱.Models.Entities;
     using 家谱.Services;
 
     [Authorize] // 必须登录才能访问此控制器下的所有接口
@@ -33,7 +35,7 @@
                 && byte.Parse(User.FindFirst(ClaimTypes.Role)!.Value) > 2)
                 throw new UnauthorizedAccessException("无权限访问此资源");
             var list = await _poemService.GetByTreeIdAsync(treeId);
-            return Ok(new ErrorResponse { Code = 200, Message = "查询成功", Data = list });
+            return Ok(new ApiResponse<List<GenoGenerationPoem>> { Code = 200, Message = "获取成功", Data = list });
         }
 
         [HttpPost("Add")]
@@ -47,7 +49,7 @@
                 && byte.Parse(User.FindFirst(ClaimTypes.Role)!.Value) > 2)
                 throw new UnauthorizedAccessException("无权限访问此资源");
             await _poemService.CreateAsync(dto);
-            return Ok(new ErrorResponse { Code = 200, Message = "字辈添加成功" });
+            return Ok(ApiResponse.Ok());
         }
 
         [HttpPut("Update")]
@@ -68,7 +70,7 @@
                 return BadRequest(new ErrorResponse { Code = 400, Message = "不允许修改树ID，必须在同一棵树内修改" });
             // 其他字段的修改权限已经在服务层检查了，这里就不重复检查了
             await _poemService.UpdateAsync(dto, poemId);
-            return Ok(new ErrorResponse { Code = 200, Message = "字辈修改成功" });
+            return Ok(ApiResponse.Ok("操作成功！"));
         }
 
         [HttpDelete("Del/{id}")]
@@ -83,7 +85,7 @@
                 && byte.Parse(User.FindFirst(ClaimTypes.Role)!.Value) > 2)
                 throw new UnauthorizedAccessException("无权限访问此资源");
             await _poemService.DeleteAsync(id);
-            return Ok(new ErrorResponse { Code = 200, Message = "字辈删除成功" });
+            return Ok(new ApiResponse { Code = 200, Message = "字辈删除成功" });
         }
     }
 }

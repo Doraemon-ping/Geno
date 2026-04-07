@@ -25,8 +25,6 @@
 
         public byte RoleType { get; set; }
 
-        public Guid? AssociatedMemberID { get; set; }
-
         public byte UserStatus { get; set; }
 
         public DateTime CreatedAt { get; set; }

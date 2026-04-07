@@ -16,16 +16,17 @@
 
         // 定义数据集，对应数据库中的表
 
-        public DbSet<SysUser> Users { get; set; } = null!;
-
+        public DbSet<SysUser> Users { get; set; } = null!; // 系统用户表，包含管理员和普通用户
         // 以后增加的表也写在这里，例如：
         // public DbSet<GenoMember> Members { get; set; }
+        public DbSet<GenoGenerationPoem> GenoGenerationPoems { get; set; } = null!;// 字辈诗表，关联家谱树
+        public DbSet<GenoTree> GenoTrees { get; set; } = null!;// 家谱树表，包含树的基本信息和权限控制字段
+        public DbSet<GenoMember> GenoMembers { get; set; } = null!;// 家谱成员表，包含成员的基本信息和与树的关联
+        public DbSet<DataLog> DataLogs { get; set; } = null!; // 数据变更日志表，记录所有审核通过的修改历史（快照审计）
+        public DbSet<ReviewTask> ReviewTasks { get; set; } = null!; // 审核任务表，记录待审核的修改请求和审核状态
 
-        public DbSet<AuditRequest> AuditRequests { get; set; } = null!;
 
-        public DbSet<GenoGenerationPoem> GenoGenerationPoems { get; set; } = null!;
 
-        public DbSet<GenoTree> GenoTrees { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

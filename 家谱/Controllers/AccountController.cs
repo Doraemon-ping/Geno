@@ -3,8 +3,12 @@
     using Microsoft.AspNetCore.Authorization;
     using Microsoft.AspNetCore.Identity.Data;
     using Microsoft.AspNetCore.Mvc;
+    using System.Runtime.InteropServices;
     using System.Security.Claims;
+    using System.Text.Json;
     using 家谱.Models.DTOs;
+    using 家谱.Models.DTOs.Common;
+    using 家谱.Models.Enums;
     using 家谱.Services;
 
     [ApiController]
@@ -12,10 +16,12 @@
     public class AccountController : ControllerBase
     {
         private readonly IAuthService _authService;
+        private readonly IReviewService _reviewService;
 
-        public AccountController(IAuthService authService)
+        public AccountController(IAuthService authService, IReviewService reviewService)
         {
             _authService = authService;
+            _reviewService = reviewService;
         }
 
         [HttpPost("send-code")]
@@ -126,6 +132,33 @@
         {
             var result = await _authService.ResetPasswordAsync(request.Email, request.Code, request.NewPassword);
             return result.success ? Ok(new { message = result.message }) : BadRequest(new { message = result.message });
+        }
+
+        // 申请管理员权限接口，用户提交后进入审核流程
+        [HttpPost("apply-admin")]
+        [Authorize] // 必须登录
+        public async Task<IActionResult> ApplyAdmin([FromBody] RoleApplyPayload dto)
+        {
+            // 1. 获取当前登录用户 ID (假设从 Claims 中取)
+            var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+
+            // 2. 验证目标用户是否存在（如果 TargetId 是用户 ID）
+            var user = await _authService.GetUserProfileAsync(dto.TargetId);
+            if (user == null)
+            {
+                return NotFound(new { message = "目标用户不存在" });
+            }
+
+            var submitResult = new SubmitReviewRequest
+            {
+                TreeId = null, // 升限不针对特定家谱树
+                TargetId = dto.TargetId, // 申请的目标 ID
+                ActionCode = ReviewActions.ApplyAdmin, // 预定义的操作代码
+                ChangeData = JsonSerializer.Serialize(dto),
+                Reason = dto.Reason
+            };
+            var result = await _reviewService.SubmitAsync(submitResult, userId);
+            return Ok(ApiResponse.Ok("申请已提交"));
         }
     }
 }
