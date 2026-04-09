@@ -43,7 +43,7 @@
 
             var response = new ErrorResponse
             {
-                Code = context.Response.StatusCode,
+                Code = 500,
                 Message = exception.Message
             };
 

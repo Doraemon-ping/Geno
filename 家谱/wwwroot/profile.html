@@ -2,7 +2,6 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>个人中心 - 赵氏宗亲数字化平台</title>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&display=swap" rel="stylesheet">
@@ -12,74 +11,37 @@
             --primary-light: #fdfaf2;
             --accent: #d2691e;
             --danger: #ff4d4f;
-            --shadow: 0 10px 30px rgba(0,0,0,0.05);
+            --success: #52c41a;
+            --warning: #faad14;
+            --gray: #999;
+            --bg: #fdfaf2;
         }
 
         body {
-            margin: 0;
             font-family: "Noto Serif SC", serif;
-            background: var(--primary-light);
-            padding-top: 100px;
+            background: var(--bg);
+            margin: 0;
+            padding-top: 80px;
             color: #333;
-            line-height: 1.6;
         }
 
-        /* 导航栏 */
-        .navbar {
-            position: fixed;
-            top: 0;
-            width: 100%;
-            height: 80px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0 5%;
-            background: rgba(255,255,255,0.95);
-            backdrop-filter: blur(10px);
-            border-bottom: 1px solid rgba(139,69,19,0.1);
-            z-index: 1000;
-            box-sizing: border-box;
-        }
-
-        .logo {
-            font-size: 24px;
-            color: var(--primary);
-            text-decoration: none;
-            font-weight: bold;
-            letter-spacing: 2px;
-        }
-
-        .nav-links a {
-            text-decoration: none;
-            color: #666;
-            margin-left: 25px;
-            transition: 0.3s;
-            font-size: 15px;
-        }
-
-            .nav-links a.active {
-                color: var(--primary);
-                font-weight: bold;
-            }
-
-        /* 布局容器 */
         .container {
             max-width: 1200px;
             margin: 0 auto;
-            padding: 0 20px;
             display: grid;
-            grid-template-columns: 1fr 350px;
-            gap: 30px;
+            grid-template-columns: 1fr 320px;
+            gap: 25px;
+            padding: 0 20px;
         }
 
-        /* 卡片通用样式 */
+        /* 保持原有的复古卡片风格 */
         .card {
             background: #fff;
             border-radius: 12px;
-            box-shadow: var(--shadow);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
             padding: 30px;
-            margin-bottom: 30px;
-            border: 1px solid rgba(0,0,0,0.02);
+            margin-bottom: 25px;
+            border: 1px solid rgba(139, 69, 19, 0.1);
         }
 
         .section-title {
@@ -91,112 +53,111 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            font-weight: bold;
         }
 
-        /* 表单样式 */
+        /* 个人信息美化布局 */
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+
         .form-group {
-            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
         }
 
             .form-group label {
-                display: block;
                 font-size: 13px;
-                color: #888;
+                color: var(--primary);
                 margin-bottom: 8px;
+                font-weight: bold;
             }
 
-        input {
-            width: 100%;
-            padding: 12px 15px;
-            border: 1px solid #e0e0e0;
-            border-radius: 6px;
-            box-sizing: border-box;
-            font-family: inherit;
-            transition: 0.3s;
+            .form-group input {
+                padding: 12px;
+                border: 1px solid #e0d8cf;
+                border-radius: 6px;
+                font-family: inherit;
+                font-size: 15px;
+                transition: 0.3s;
+            }
+
+                .form-group input:focus {
+                    outline: none;
+                    border-color: var(--primary);
+                    background: #fffaf5;
+                }
+
+                .form-group input[readonly] {
+                    background: #f5f5f5;
+                    color: #777;
+                    border-style: dashed;
+                }
+
+        /* 审批列表项 */
+        .audit-item {
+            border: 1px solid #f0ede9;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            padding: 20px;
+            border-left: 6px solid #e0d8cf;
+            background: #fff;
         }
 
-            input:focus {
-                outline: none;
-                border-color: var(--primary);
-                box-shadow: 0 0 0 3px rgba(139,69,19,0.1);
-            }
+        .status-0 {
+            border-left-color: var(--warning);
+        }
 
-        /* 按钮 */
-        .btn {
-            padding: 12px 24px;
+        .status-1 {
+            border-left-color: var(--success);
+        }
+
+        .status-2 {
+            border-left-color: var(--danger);
+        }
+
+        .status-3 {
+            border-left-color: var(--gray);
+        }
+
+        .detail-box {
+            display: none;
+            margin-top: 15px;
+            padding: 15px;
+            background: #fcfaf8;
             border-radius: 6px;
-            cursor: pointer;
-            border: none;
-            font-family: inherit;
+            border: 1px solid #eee;
+        }
+
+        .data-row {
+            display: flex;
+            margin-bottom: 8px;
+            font-size: 14px;
+            border-bottom: 1px solid #f9f6f2;
+            padding-bottom: 4px;
+        }
+
+        .data-label {
+            width: 100px;
+            color: #888;
+            flex-shrink: 0;
+        }
+
+        .data-value {
             font-weight: bold;
-            transition: 0.3s;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
+            color: #444;
         }
 
         .btn-primary {
             background: var(--primary);
             color: white;
-        }
-
-            .btn-primary:hover {
-                background: var(--accent);
-                transform: translateY(-1px);
-            }
-
-        .btn-ghost {
-            background: #f5f5f5;
-            color: #666;
-        }
-
-        /* 待办列表样式 */
-        .todo-item {
-            padding: 15px;
-            border-bottom: 1px solid #f0f0f0;
+            border: none;
+            padding: 10px 25px;
+            border-radius: 4px;
             cursor: pointer;
-            transition: 0.2s;
-            border-left: 3px solid transparent;
-        }
-
-            .todo-item:hover {
-                background: #fffaf5;
-                border-left-color: var(--primary);
-            }
-
-            .todo-item .tag {
-                font-size: 11px;
-                padding: 2px 6px;
-                border-radius: 4px;
-                margin-right: 8px;
-                background: #fff1f0;
-                color: var(--danger);
-                border: 1px solid #ffa39e;
-            }
-
-            .todo-item .time {
-                display: block;
-                font-size: 11px;
-                color: #999;
-                margin-top: 4px;
-            }
-
-        /* 审批大卡片列表 */
-        .audit-card-item {
-            padding: 20px;
-            border: 1px solid #f0f0f0;
-            border-radius: 8px;
-            margin-bottom: 15px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            transition: all 0.4s ease;
-        }
-
-        .highlight-flash {
-            background-color: #fffbe6 !important;
-            border-color: #ffe58f !important;
-            box-shadow: 0 0 15px rgba(255, 229, 143, 0.6);
+            font-family: inherit;
         }
 
         .todo-count {
@@ -205,274 +166,220 @@
             padding: 2px 8px;
             border-radius: 10px;
             font-size: 12px;
-            margin-left: 8px;
-        }
-
-        @media (max-width: 900px) {
-            .container {
-                grid-template-columns: 1fr;
-            }
-
-            .navbar {
-                padding: 0 20px;
-            }
         }
     </style>
 </head>
 <body>
 
-    <nav class="navbar">
-        <a href="index.html" class="logo">赵氏宗亲平台</a>
-        <div class="nav-links">
-            <a href="index.html">首页</a>
-            <a href="my-trees.html">我的族谱</a>
-            <a href="profile.html" class="active">个人中心</a>
-        </div>
-    </nav>
-
     <div class="container">
-        <div class="main-content">
-            <div class="card">
-                <div class="section-title">宗亲基本资料</div>
-                <div class="form-group">
-                    <label>宗亲名号 (不可更改)</label>
-                    <input type="text" id="u-name" readonly style="background:#f9f9f9; color:#999">
-                </div>
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+        <div class="main">
+            <div class="card" id="user-profile-section">
+                <div class="section-title">宗亲名录资料</div>
+                <div class="info-grid">
                     <div class="form-group">
-                        <label>联络邮箱</label>
-                        <input type="email" id="u-email">
+                        <label>族中名号 (不可更改)</label>
+                        <input id="u-name" readonly>
                     </div>
                     <div class="form-group">
-                        <label>手机号码</label>
-                        <input type="tel" id="u-phone">
+                        <label>联络手机</label>
+                        <input id="u-phone" type="tel" placeholder="请输入联络手机">
+                    </div>
+                    <div class="form-group" style="grid-column: span 2;">
+                        <label>电子邮箱</label>
+                        <input id="u-email" type="email" placeholder="请输入常用邮箱">
                     </div>
                 </div>
-                <div style="margin-top:10px; display:flex; gap:15px;">
-                    <button class="btn btn-primary" onclick="updateProfile()">修订资料</button>
-                    <button class="btn btn-ghost" onclick="applyRole()">申请管理员权限</button>
-                </div>
+                <button class="btn-primary" style="margin-top:20px;" onclick="saveProfile()">修订并保存</button>
             </div>
 
-            <div id="admin-panel" class="card" style="display:none;">
+            <div class="card">
                 <div class="section-title">
                     <span>族务审批中心</span>
-                    <span id="audit-total-badge" class="todo-count" style="display:none">0</span>
+                    <span id="main-badge" class="todo-count" style="display:none">0</span>
                 </div>
-                <div id="audit-items-detailed">
-                </div>
+                <div id="audit-list-main">正在同步模版并获取族务数据...</div>
             </div>
         </div>
 
         <div class="sidebar">
-            <div class="card" style="border-top: 3px solid var(--primary); padding: 20px;">
-                <div class="section-title" style="font-size: 16px;">
-                    <span>🔔 实时待办</span>
-                    <span id="sidebar-badge" class="todo-count" style="display:none">0</span>
-                </div>
-
-                <div id="todo-empty-state" style="text-align:center; padding:30px 0;">
-                    <div style="font-size:40px; opacity:0.2;">📜</div>
-                    <p style="color:#999; font-size:13px; margin-top:10px;">海内升平，暂无待办</p>
-                </div>
-
-                <div id="todo-list-sidebar" style="display:none;">
-                </div>
-            </div>
-
-            <div class="card" style="background: #fffdfa;">
-                <div class="section-title" style="font-size: 16px; color: var(--accent);">🛡️ 账号状态</div>
-                <div style="font-size:13px; color:#888;">
-                    最后更新：<span id="last-check-time">-</span><br>
-                    安全等级：<span style="color:green; font-weight:bold;">高</span>
-                </div>
-                <button class="btn btn-ghost" style="width:100%; margin-top:20px; font-size:13px;" onclick="location.href='index.html'">返回首页</button>
+            <div class="card">
+                <div class="section-title" style="font-size:16px;">📜 实时通报</div>
+                <div id="sidebar-list" style="font-size:13px; line-height:2.2; color:#666;"></div>
             </div>
         </div>
     </div>
 
     <script>
-        // 1. 初始化配置
-        const token = localStorage.getItem('token');
-        const api = axios.create({
-            baseURL: '/api',
-            headers: { Authorization: `Bearer ${token}` }
-        });
+        const api = axios.create({ baseURL: '/api', headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
 
-        // 响应拦截
-        api.interceptors.response.use(
-            r => r,
-            e => {
-                if (e.response && e.response.status === 401) {
-                    alert("登录失效");
-                    window.location.href = 'login.html';
-                }
-                return Promise.reject(e);
-            }
-        );
+        // 全局常量映射
+        const RoleTypeNames = { 0: "超级管理员", 1: "管理员", 2: "编辑者", 3: "观察者" };
+        const StatusMap = {
+            0: "<span style='color:var(--warning)'>待审核</span>",
+            1: "<span style='color:var(--success)'>已通过</span>",
+            2: "<span style='color:var(--danger)'>已驳回</span>",
+            3: "<span style='color:var(--gray)'>已撤回</span>"
+        };
+        const ActionNameMap = { "ApplyAdmin": "申请管理员权限", "Tree.ApplyRole": "申请树协作权限" };
 
-        // 2. 页面初始化
-        async function initPage() {
-            try {
-                // 获取个人资料 (GET /api/Account/profile)
-                const user = await api.get('/Account/profile').then(r => r.data);
-
-                document.getElementById('u-name').value = user.username;
-                document.getElementById('u-email').value = user.email || '';
-                document.getElementById('u-phone').value = user.phone || '';
-                document.getElementById('last-check-time').innerText = new Date().toLocaleTimeString();
-
-                // 权限控制：假设后端 role <= 2 为管理权限
-                if (true) {
-                    document.getElementById('admin-panel').style.display = 'block';
-                    fetchAuditTasks();
-                    setInterval(fetchAuditTasks, 30000); // 30秒轮询
-                }
-            } catch (err) {
-                console.error("初始化失败", err);
-            }
-        }
-
-        // 5. 权限申请 (POST /api/Audit/apply-role)
-        async function applyRole() {
-            const reason = prompt("请说明申请理由（如：负责录入某支脉族谱）：");
-            if (!reason) return;
-            try {
-                await api.post('/Audit/apply-role', {
-                    targetRole: 2,
-                    reason: reason
-                });
-                alert("申请已提交，请静候宗亲会审核");
-            } catch (err) {
-                alert("提交失败");
-            }
-        }
-
-        // 6. 资料修订 (PUT /api/Account/update-profile)
-        async function updateProfile() {
-            try {
-                await api.put('/Account/update-profile', {
-                    username: document.getElementById('u-name').value,
-                    email: document.getElementById('u-email').value,
-                    phone: document.getElementById('u-phone').value
-                });
-                alert("修订成功");
-            } catch (err) {
-                alert("修订失败");
-            }
-        }
+        let cardFactoryDoc = null;
 
         /**
- * 获取并渲染待审批任务 (基于最新 JSON 结构)
- */
-        async function fetchAuditTasks() {
-            try {
-                const res = await api.get('/Audit/pending-list');
-                // 注意：如果后端返回的是单个对象而非数组，这里做个兼容处理
-                const data = res.data;
-                const list = Array.isArray(data) ? data : (data ? [data] : []);
-
-                const sBadge = document.getElementById('sidebar-badge');
-                const mBadge = document.getElementById('audit-total-badge');
-                const emptyState = document.getElementById('todo-empty-state');
-                const sidebarList = document.getElementById('todo-list-sidebar');
-                const mainItems = document.getElementById('audit-items-detailed');
-
-                if (list.length > 0) {
-                    // 1. 更新计数器
-                    [sBadge, mBadge].forEach(el => {
-                        if (el) {
-                            el.innerText = list.length;
-                            el.style.display = 'inline-block';
-                        }
-                    });
-
-                    if (emptyState) emptyState.style.display = 'none';
-
-                    // 2. 渲染侧边栏简易项
-                    if (sidebarList) {
-                        sidebarList.style.display = 'block';
-                        sidebarList.innerHTML = list.map(item => `
-                    <div class="todo-item" onclick="focusAuditItem('${item.id}')">
-                        <span class="tag">待审批</span>
-                        <span style="font-size:13px;">${item.reason === 'string' ? '权限变更申请' : (item.reason || '身份申请')}</span>
-                        <span class="time">编号: ${item.id.substring(0, 8)}</span>
-                    </div>
-                `).join('');
-                    }
-
-                    // 3. 渲染主界面详细列表
-                    if (mainItems) {
-                        mainItems.innerHTML = list.map(item => `
-                    <div id="audit-row-${item.id}" class="audit-card-item">
-                        <div style="flex:1">
-                            <div style="font-weight:bold; font-size:15px; color:var(--primary);">
-                                申请人: <span style="color:#666; font-weight:normal;">${item.applicantId.substring(0, 13)}...</span>
-                            </div>
-                            <div style="color:#444; font-size:14px; margin-top:8px;">
-                                <strong>申请事由：</strong>${item.reason === 'string' ? '未详细说明' : item.reason}
-                            </div>
-                            <div style="font-size:12px; color:#999; margin-top:5px;">
-                                提交时间：${new Date(item.createdAt).toLocaleString()}
-                            </div>
-                        </div>
-                        <div style="display:flex; gap:10px;">
-                            <button class="btn btn-primary" style="padding:8px 16px; font-size:12px;" 
-                                    onclick="handleAudit('${item.id}', 1)">准许</button>
-                            <button class="btn" style="padding:8px 16px; font-size:12px; color:var(--danger); border:1px solid #ffccc7;" 
-                                    onclick="handleAudit('${item.id}', 2)">驳回</button>
-                        </div>
-                    </div>
-                `).join('');
-                    }
-                } else {
-                    // 无数据时的重置逻辑
-                    [sBadge, mBadge].forEach(el => { if (el) el.style.display = 'none'; });
-                    if (emptyState) emptyState.style.display = 'block';
-                    if (sidebarList) sidebarList.style.display = 'none';
-                    if (mainItems) mainItems.innerHTML = '<p style="text-align:center; color:#999; padding:40px;">暂无待办事务</p>';
-                }
-            } catch (err) {
-                console.error("同步待办列表失败:", err);
-            }
-        }
-
-        /**
-         * 处理审批 (对接 HandleAuditDto)
+         * 加载卡片工厂模版库
          */
-        async function handleAudit(id, action) {
-            const remark = prompt(action === 1 ? "通过备注（选填）：" : "驳回原因（必填）：");
-            if (action === 2 && !remark) return alert("驳回必须填写理由");
-
+        async function loadCardFactory() {
             try {
-                await api.post('/Audit/handle', {
-                    requestId: id,       // 对应后端 HandleAuditDto 中的 requestId
-                    action: action,      // 1:通过, 2:驳回
-                    auditRemark: remark
-                });
-                alert("操作成功，结果已入库");
-                fetchAuditTasks(); // 刷新列表
-            } catch (err) {
-                alert("操作失败: " + (err.response?.data?.title || "接口异常"));
+                const res = await fetch('AuditCards.html');
+                if (!res.ok) throw new Error("无法读取模版库");
+                const html = await res.text();
+                const parser = new DOMParser();
+                cardFactoryDoc = parser.parseFromString(html, 'text/html');
+            } catch (e) {
+                console.error(e);
+                document.getElementById('audit-list-main').innerHTML = "模版库加载失败，请检查 AuditCards.html";
             }
         }
 
         /**
-         * 侧边栏定位跳转
+         * 生成卡片 HTML
          */
-        function focusAuditItem(id) {
-            const target = document.getElementById(`audit-row-${id}`);
-            if (target) {
-                target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                target.classList.add('highlight-flash');
-                setTimeout(() => target.classList.remove('highlight-flash'), 2000);
+        function renderCard(task) {
+            if (!cardFactoryDoc) return "模版未就绪";
+
+            let data = {};
+            try {
+                data = typeof task.changeData === 'string' ? JSON.parse(task.changeData) : (task.changeData || {});
+            } catch (e) { console.error("解析错误", e); }
+
+            // 【修正点 1】去除空格并规范化 ActionName 匹配
+            const actionKey = task.actionName ? task.actionName.trim() : "";
+            let template = cardFactoryDoc.getElementById(actionKey);
+            if (!template) template = cardFactoryDoc.getElementById('DefaultCard');
+
+            const clone = template.content.cloneNode(true);
+
+            // 【修正点 2】使用字符串兼容模式匹配 NewRole
+            const RoleTypeNames = { "0": "超级管理员", "1": "管理员", "2": "编辑者", "3": "观察者" };
+
+            if (actionKey === 'ApplyAdmin' || actionKey === 'Tree.ApplyRole') {
+                const roleEl = clone.querySelector('[data-field="NewRoleName"]');
+                if (roleEl) {
+                    // 确保 data.NewRole 无论数字还是字符串都能匹配
+                    roleEl.innerText = RoleTypeNames[String(data.NewRole)] || "未知职务";
+                }
+
+                const reasonEl = clone.querySelector('[data-field="Reason"]');
+                if (reasonEl) reasonEl.innerText = data.Reason || "未说明理由";
+
+                const tidEl = clone.querySelector('[data-field="TargetId"]');
+                if (tidEl) tidEl.innerText = data.TargetId || "-";
+
+                // 【修正点 3】增加状态 3 (撤回) 的显示支持
+                const statusEl = clone.querySelector('[data-field="StatusText"]');
+                if (statusEl) {
+                    const currentStatus = String(task.status);
+                    statusEl.innerHTML = StatusMap[currentStatus] || `<span style="color:#999">状态码: ${currentStatus}</span>`;
+                }
+            } else {
+                const raw = clone.querySelector('.raw-json');
+                if (raw) raw.innerText = JSON.stringify(data, null, 2);
+            }
+
+            const container = document.createElement('div');
+            container.appendChild(clone);
+            return container.innerHTML;
+        }
+
+        async function init() {
+            await loadCardFactory(); // 必须先加载模版
+
+            // 1. 加载资料
+            try {
+                const p = await api.get('/Account/profile');
+                if (p.data.code === 200) {
+                    const u = p.data.data;
+                    document.getElementById('u-name').value = u.username;
+                    document.getElementById('u-email').value = u.email || '';
+                    document.getElementById('u-phone').value = u.phone || '';
+                }
+            } catch (e) { }
+
+            // 2. 加载任务
+            loadTasks();
+        }
+
+        async function loadTasks() {
+            try {
+                const t = await api.post('/Task/get-all');
+                const list = t.data.data || [];
+
+                // 更新 Badge
+                const pending = list.filter(i => String(i.status) === "0");
+                const badge = document.getElementById('main-badge');
+                badge.innerText = pending.length;
+                badge.style.display = pending.length ? 'inline-block' : 'none';
+
+                // 渲染主列表
+                document.getElementById('audit-list-main').innerHTML = list.map(item => `
+            <div class="audit-item status-${item.status}" id="task-${item.taskId}">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <strong>${ActionNameMap[item.actionName] || item.actionName}</strong>
+                        <div style="font-size:12px; color:#999; margin-top:5px;">提交人：${item.submitterName}</div>
+                    </div>
+                    <button class="btn-primary" style="padding:6px 12px; font-size:12px;" onclick="toggleDetail('${item.taskId}')">详情</button>
+                </div>
+                <div class="detail-box" id="detail-${item.taskId}">
+                    ${renderCard(item)}
+                    ${String(item.status) === "0" ? `
+                        <div style="margin-top:15px; border-top:1px dashed #eee; padding-top:12px; display:flex; gap:10px;">
+                            <button onclick="handleAudit('${item.taskId}', 1)" style="color:var(--success); border:1px solid var(--success); background:none; padding:4px 12px; cursor:pointer;">批准</button>
+                            <button onclick="handleAudit('${item.taskId}', 2)" style="color:var(--danger); border:1px solid var(--danger); background:none; padding:4px 12px; cursor:pointer;">驳回</button>
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+        `).join('');
+
+                // 【修正点 4】侧边栏严格匹配状态
+                document.getElementById('sidebar-list').innerHTML = list.map(i => {
+                    const s = String(i.status);
+                    let sLabel = "未知";
+                    let sColor = "#999";
+
+                    if (s === "0") { sLabel = "待办"; sColor = "var(--warning)"; }
+                    else if (s === "1") { sLabel = "已过"; sColor = "var(--success)"; }
+                    else if (s === "2") { sLabel = "驳回"; sColor = "var(--danger)"; }
+                    else if (s === "3") { sLabel = "撤回"; sColor = "#999"; }
+
+                    return `<div style="margin-bottom:8px;"><span style="color:${sColor}">[${sLabel}]</span> ${ActionNameMap[i.actionName] || i.actionName}</div>`;
+                }).join('');
+
+            } catch (e) {
+                console.error("任务列表加载失败", e);
             }
         }
 
-        
+        function toggleDetail(id) {
+            const el = document.getElementById('detail-' + id);
+            el.style.display = el.style.display === 'block' ? 'none' : 'block';
+        }
 
-        // 入口执行
-        initPage();
+        async function handleAudit(id, status) {
+            const note = prompt("审批意见：");
+            await api.post('/Task/handle', { taskId: id, status: status, reviewNotes: note });
+            location.reload();
+        }
+
+        async function saveProfile() {
+            const res = await api.put('/Account/update-profile', {
+                email: document.getElementById('u-email').value,
+                phone: document.getElementById('u-phone').value
+            });
+            if (res.data.code === 200) alert("名录资料修订成功！");
+        }
+
+        init();
     </script>
 </body>
 </html>

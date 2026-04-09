@@ -8,14 +8,17 @@
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <style>
         :root {
-            --primary: #8b4513; /* 朱砂棕 */
-            --accent: #d2691e;
-            --glass: rgba(255, 255, 255, 0.88);
-            --ink: #2c1e16;
+            --primary-brown: #794c30; /* 主色：沉稳棕 */
+            --dark-brown: #4a2e1b; /* 深棕：用于强调和对比 */
+            --light-brown: #c8b4a2; /* 浅棕：用于辅助装饰 */
+            --bg-color: #f0ebe1; /* 页面背景：极浅的米色，凸显白色卡片 */
+            --text-main: #333333;
+            --text-muted: #888888;
         }
 
         * {
             box-sizing: border-box;
+            transition: all 0.3s ease;
         }
 
         body, html {
@@ -23,202 +26,321 @@
             padding: 0;
             height: 100%;
             font-family: 'Noto Serif SC', serif;
+            background-color: var(--bg-color);
             display: flex;
             align-items: center;
             justify-content: center;
-            /* 建议背景图：具有东方神韵的山水或古籍纹理 */
-            background: url('https://images.unsplash.com/photo-1578330132821-4912f71120c4?q=80&w=2000') center/cover no-repeat;
         }
 
-        /* 黑色半透明蒙版，增强文字可读性 */
-        .overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.45);
-            z-index: 1;
+        /* 核心卡片容器 */
+        .login-wrapper {
+            display: flex;
+            width: 1000px;
+            max-width: 90%;
+            height: 600px;
+            background: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(74, 46, 27, 0.08);
+            overflow: hidden; /* 保证内部元素不出界 */
         }
 
-        .login-card {
+        /* ================= 左侧品牌区 ================= */
+        .brand-side {
+            flex: 1;
+            background-color: #f7f5f0;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 40px;
+            overflow: hidden;
+            border-right: 1px solid rgba(0,0,0,0.03);
+        }
+
+        /* 仿照参考图的纯 CSS 几何装饰图形 */
+        .shape {
+            position: absolute;
+            border-radius: 50%;
+        }
+
+        .shape-1 {
+            width: 300px;
+            height: 300px;
+            background: var(--dark-brown);
+            top: -100px;
+            right: -100px;
+        }
+
+        .shape-2 {
+            width: 200px;
+            height: 200px;
+            background: var(--light-brown);
+            top: -50px;
+            left: 10%;
+        }
+
+        .shape-3 {
+            width: 250px;
+            height: 250px;
+            background: var(--primary-brown);
+            bottom: -100px;
+            left: -100px;
+        }
+
+        .shape-4 {
+            width: 80px;
+            height: 80px;
+            background: var(--light-brown);
+            bottom: 50px;
+            right: 50px;
+        }
+
+        .shape-5 {
+            width: 20px;
+            height: 20px;
+            background: var(--primary-brown);
+            top: 45%;
+            right: 25%;
+        }
+
+        /* 品牌 Logo 与标题 */
+        .brand-content {
             position: relative;
             z-index: 10;
-            width: 100%;
-            max-width: 420px;
-            padding: 60px 45px;
-            background: var(--glass);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border-radius: 4px;
-            box-shadow: 0 30px 60px rgba(0,0,0,0.4);
-            border: 1px solid rgba(255,255,255,0.3);
             text-align: center;
-            animation: fadeIn 0.8s ease-out;
+            color: var(--dark-brown);
         }
 
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+        .brand-logo {
+            width: 80px;
+            height: 80px;
+            background: var(--dark-brown);
+            color: #fff;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            font-weight: bold;
+            margin: 0 auto 20px;
+            transform: rotate(-10deg); /* 增加一点活泼感 */
         }
 
-        .title-area h2 {
+        .brand-content h1 {
             font-size: 32px;
-            color: var(--primary);
             margin: 0;
-            letter-spacing: 8px;
-            font-weight: 700;
+            letter-spacing: 4px;
         }
 
-        .title-area p {
-            font-size: 14px;
-            color: #777;
-            margin: 15px 0 45px;
-            letter-spacing: 2px;
-            text-transform: uppercase;
+        /* 左侧底部链接 */
+        .footer-links {
+            position: absolute;
+            bottom: 30px;
+            display: flex;
+            gap: 20px;
+            font-size: 12px;
+            font-family: sans-serif;
+            color: var(--text-muted);
+            z-index: 10;
         }
 
-        .form-group {
+            .footer-links a {
+                color: inherit;
+                text-decoration: none;
+                font-weight: bold;
+            }
+
+                .footer-links a:hover {
+                    color: var(--primary-brown);
+                }
+
+        /* ================= 右侧表单区 ================= */
+        .form-side {
+            flex: 1;
+            padding: 60px 80px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            background: #ffffff;
+        }
+
+            .form-side h2 {
+                font-size: 30px;
+                color: var(--dark-brown);
+                margin-bottom: 40px;
+                font-weight: bold;
+                letter-spacing: 2px;
+            }
+
+        /* 极简下划线输入框（参考图风格） */
+        .input-group {
+            margin-bottom: 30px;
             position: relative;
-            margin-bottom: 25px;
-            text-align: left;
         }
 
-            .form-group label {
+            .input-group label {
                 display: block;
                 font-size: 12px;
-                color: #888;
+                color: var(--text-muted);
                 margin-bottom: 8px;
+                font-family: sans-serif;
                 font-weight: bold;
-                padding-left: 2px;
             }
 
-            .form-group input {
+            .input-group input {
                 width: 100%;
-                padding: 14px 18px;
-                background: rgba(255,255,255,0.6);
-                border: 1px solid rgba(139, 69, 19, 0.15);
-                border-radius: 2px;
+                padding: 8px 0;
+                border: none;
+                border-bottom: 2px solid #eeeeee;
                 font-size: 16px;
+                color: var(--text-main);
                 outline: none;
-                transition: all 0.3s;
-                color: var(--ink);
+                background: transparent;
             }
 
-                .form-group input:focus {
-                    border-color: var(--primary);
-                    background: #fff;
-                    box-shadow: 0 0 12px rgba(139, 69, 19, 0.1);
+                .input-group input:focus {
+                    border-bottom-color: var(--primary-brown);
                 }
 
-        /* 功能链接区 */
-        .extra-actions {
+        /* 记住密码与辅助链接 */
+        .form-actions {
             display: flex;
             justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
             margin-bottom: 30px;
-            font-size: 13px;
+            font-family: sans-serif;
         }
 
-            .extra-actions a {
-                color: #888;
-                text-decoration: none;
-                transition: 0.2s;
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--text-muted);
+            cursor: pointer;
+        }
+
+            .checkbox-label input {
+                accent-color: var(--primary-brown);
             }
 
-                .extra-actions a:hover {
-                    color: var(--primary);
-                }
-
-        .btn-login {
+        .btn-submit {
             width: 100%;
-            padding: 16px;
-            background: var(--primary);
+            padding: 14px;
+            background-color: var(--primary-brown);
             color: white;
             border: none;
-            border-radius: 2px;
+            border-radius: 30px; /* 圆角药丸形按钮 */
             font-size: 16px;
-            cursor: pointer;
-            transition: 0.3s;
-            letter-spacing: 10px;
             font-weight: bold;
-            box-shadow: 0 4px 15px rgba(139, 69, 19, 0.2);
+            letter-spacing: 4px;
+            cursor: pointer;
+            box-shadow: 0 8px 20px rgba(121, 76, 48, 0.2);
         }
 
-            .btn-login:hover {
-                background: var(--accent);
+            .btn-submit:hover {
+                background-color: var(--dark-brown);
                 transform: translateY(-2px);
-                box-shadow: 0 8px 25px rgba(139, 69, 19, 0.4);
             }
 
-        .register-tip {
-            margin-top: 35px;
-            font-size: 14px;
-            color: #666;
+        .forgot-link {
+            display: block;
+            text-align: center;
+            margin-top: 25px;
+            font-size: 12px;
+            color: var(--text-muted);
+            text-decoration: none;
+            font-family: sans-serif;
         }
 
-            .register-tip a {
-                color: var(--primary);
-                font-weight: bold;
-                text-decoration: none;
-                border-bottom: 1px solid transparent;
-                transition: 0.3s;
+            .forgot-link:hover {
+                color: var(--primary-brown);
+                text-decoration: underline;
             }
 
-                .register-tip a:hover {
-                    border-bottom-color: var(--primary);
-                }
-
-        /* 错误反馈 */
         #msg {
-            margin-bottom: 20px;
-            font-size: 13px;
             color: #d32f2f;
+            font-size: 13px;
+            margin-bottom: 20px;
             display: none;
+            font-weight: bold;
+        }
+
+        /* 响应式：移动端堆叠显示 */
+        @media (max-width: 768px) {
+            .login-wrapper {
+                flex-direction: column;
+                height: auto;
+                min-height: 100vh;
+                border-radius: 0;
+            }
+
+            .brand-side {
+                padding: 60px 20px;
+                flex: none;
+            }
+
+            .form-side {
+                padding: 40px 30px;
+            }
+
+            .shape-1, .shape-3 {
+                opacity: 0.5;
+            }
+            /* 移动端减弱装饰干扰 */
         }
     </style>
 </head>
 <body>
 
-    <div class="overlay"></div>
+    <div class="login-wrapper">
+        <div class="brand-side">
+            <div class="shape shape-1"></div>
+            <div class="shape shape-2"></div>
+            <div class="shape shape-3"></div>
+            <div class="shape shape-4"></div>
+            <div class="shape shape-5"></div>
 
-    <div class="login-card">
-        <div class="title-area">
-            <h2>赵氏族门</h2>
-            <p>追本溯源 · 数字化家族平台</p>
+            <div class="brand-content">
+                <div class="brand-logo">赵</div>
+                <h1>赵氏家谱</h1>
+            </div>
+
+            <div class="footer-links">
+                <a href="#">关于我们</a>
+                <a href="#">隐私政策</a>
+                <a href="#">使用条款</a>
+                <a href="#">常见问题</a>
+            </div>
         </div>
 
-        <div id="msg">信息有误，请重新查验</div>
+        <div class="form-side">
+            <h2>入谱登录</h2>
 
-        <form id="loginForm" onsubmit="handleLogin(event)">
-            <div class="form-group">
-                <label>账 号</label>
-                <input type="text" id="username" placeholder="请输入名号" required>
-            </div>
+            <div id="msg">查验失败，请重试</div>
 
-            <div class="form-group">
-                <label>入内凭证 (密码)</label>
-                <input type="password" id="password" placeholder="请输入密码" required>
-            </div>
+            <form onsubmit="handleLogin(event)">
+                <div class="input-group">
+                    <label>族人账号 / Account</label>
+                    <input type="text" id="username" placeholder="请输入名号" required>
+                </div>
 
-            <div class="extra-actions">
-                <label style="color:#888; cursor:pointer">
-                    <input type="checkbox" style="width:auto; margin-bottom:0"> 记住我
-                </label>
-                <a href="/forget-password.html">忘记凭证？</a>
-            </div>
+                <div class="input-group">
+                    <label>入内凭证 / Password</label>
+                    <input type="password" id="password" placeholder="请输入密码" required>
+                </div>
 
-            <button type="submit" class="btn-login">开启族谱</button>
-        </form>
+                <div class="form-actions">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="remember"> 铭记身份
+                    </label>
+                </div>
 
-        <div class="register-tip">
-            新成员申请入谱？<a href="/register.html">即刻加入</a>
+                <button type="submit" class="btn-submit" id="loginBtn">开启族谱</button>
+
+                <a href="/forget-password.html" class="forgot-link">遗忘凭证？</a>
+            </form>
         </div>
     </div>
 
@@ -226,6 +348,7 @@
         async function handleLogin(event) {
             event.preventDefault();
             const msgEl = document.getElementById('msg');
+            const btn = document.getElementById('loginBtn');
             msgEl.style.display = 'none';
 
             const payload = {
@@ -233,37 +356,35 @@
                 password: document.querySelector('#password').value
             };
 
+            btn.innerText = "核查中...";
+            btn.disabled = true;
+
             try {
-                // 使用 axios 更加现代化且易于处理拦截器
+                // 处理你的 { code, message, data } 返回格式
                 const res = await axios.post('/api/account/login', payload);
+                const { code, message, data } = res.data;
 
-                if (res.data.token) {
-                    localStorage.setItem('token', res.data.token);
-                    // 柔和的成功反馈
-                    const btn = document.querySelector('.btn-login');
-                    btn.innerText = "正在入谱...";
-                    btn.style.background = "#2e7d32";
-
-                    setTimeout(() => {
-                        window.location.href = "/index.html";
-                    }, 800);
+                if (code === 200) {
+                    localStorage.setItem('token', data.token);
+                    btn.innerText = "核验通过";
+                    btn.style.background = "#4a2e1b"; // 变成深棕色表示成功
+                    setTimeout(() => window.location.href = "/index.html", 800);
+                } else {
+                    msgEl.style.display = 'block';
+                    msgEl.innerText = message || "凭证有误，请重新输入";
+                    resetBtn();
                 }
             } catch (e) {
                 msgEl.style.display = 'block';
-                if (e.response && e.response.data) {
-                    msgEl.innerText = "查验失败：" + (e.response.data.message || "凭证不匹配");
-                } else {
-                    msgEl.innerText = "网络阻滞，请稍后再试";
-                }
+                msgEl.innerText = e.response?.data?.message || "网络异常，请稍后再试";
+                resetBtn();
             }
         }
 
-        // 页面初始化：如果已有 Token，尝试自动进入
-        window.onload = () => {
-            if (localStorage.getItem('token')) {
-                // 这里可以先校验一次 token 有效性，或者直接跳转
-                // window.location.href = "/index.html";
-            }
+        function resetBtn() {
+            const btn = document.getElementById('loginBtn');
+            btn.disabled = false;
+            btn.innerText = "开启族谱";
         }
     </script>
 </body>

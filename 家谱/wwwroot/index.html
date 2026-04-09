@@ -307,7 +307,7 @@
                 const res = await axios.get('/api/Account/profile', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-                const user = res.data;
+                const user = res.data.data;
                 document.getElementById('user-name').innerText = user.username;
                 // 角色逻辑：管理员显示审核入口
                 if (user.role <= 2) document.getElementById('audit-nav').style.display = 'block';

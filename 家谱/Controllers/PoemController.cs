@@ -35,7 +35,7 @@
                 && byte.Parse(User.FindFirst(ClaimTypes.Role)!.Value) > 2)
                 throw new UnauthorizedAccessException("无权限访问此资源");
             var list = await _poemService.GetByTreeIdAsync(treeId);
-            return Ok(new ApiResponse<List<GenoGenerationPoem>> { Code = 200, Message = "获取成功", Data = list });
+            return Ok(new ApiResponse { Code = 200, Message = "获取成功", Data = list });
         }
 
         [HttpPost("Add")]
@@ -49,7 +49,7 @@
                 && byte.Parse(User.FindFirst(ClaimTypes.Role)!.Value) > 2)
                 throw new UnauthorizedAccessException("无权限访问此资源");
             await _poemService.CreateAsync(dto);
-            return Ok(ApiResponse.Ok());
+            return Ok(ApiResponse.OK());
         }
 
         [HttpPut("Update")]
@@ -70,7 +70,7 @@
                 return BadRequest(new ErrorResponse { Code = 400, Message = "不允许修改树ID，必须在同一棵树内修改" });
             // 其他字段的修改权限已经在服务层检查了，这里就不重复检查了
             await _poemService.UpdateAsync(dto, poemId);
-            return Ok(ApiResponse.Ok("操作成功！"));
+            return Ok(ApiResponse.OK());
         }
 
         [HttpDelete("Del/{id}")]

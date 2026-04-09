@@ -7,6 +7,7 @@ using System.Text;
 using 家谱.DB;
 using 家谱.Middleware;
 using 家谱.Services;
+using 家谱.Services.Common;
 using 家谱.Setting;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -35,6 +36,7 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IGenoPoemService, GenoPoemService>();
 builder.Services.AddScoped<IGenoTreeService, GenoTreeService>();
 builder.Services.AddScoped<IReviewService, ReviewService>();
+builder.Services.AddScoped<IHandleTasks, HandleTasks>();
 
 // 绑定配置
 builder.Services.Configure<MailSettings>(builder.Configuration.GetSection("MailSettings"));
