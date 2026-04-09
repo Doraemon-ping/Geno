@@ -404,7 +404,7 @@
         async function loadTrees() {
             try {
                 const result = await requestJson("/api/GenoTree/GetAll", { headers: authHeaders() });
-                allTrees = Array.isArray(result) ? result.filter(item => item.isPublic) : [];
+                allTrees = Array.isArray(result.data) ? result.data.filter(item => item.isPublic) : [];
                 fillRegionFilter(allTrees);
                 renderTrees(allTrees);
             } catch (error) {

@@ -58,7 +58,15 @@ namespace 家谱.Services
 
             _context.GenoGenerationPoems.Add(poem);
             await _context.SaveChangesAsync();
-            await _auditLogService.WriteAsync("Geno_Generation_Poems", poem.PoemID, "CREATE", operatorUserId, new { }, taskId);
+            await _auditLogService.WriteAsync("Geno_Generation_Poems", poem.PoemID, "CREATE", operatorUserId, new { }, new
+            {
+                poem.PoemID,
+                poem.TreeID,
+                poem.GenerationNum,
+                poem.Word,
+                poem.Meaning,
+                poem.IsDel
+            }, taskId);
             return poem;
         }
 
@@ -84,7 +92,15 @@ namespace 家谱.Services
             poem.Meaning = dto.Meaning;
 
             await _context.SaveChangesAsync();
-            await _auditLogService.WriteAsync("Geno_Generation_Poems", poem.PoemID, "UPDATE", operatorUserId, before, taskId);
+            await _auditLogService.WriteAsync("Geno_Generation_Poems", poem.PoemID, "UPDATE", operatorUserId, before, new
+            {
+                poem.PoemID,
+                poem.TreeID,
+                poem.GenerationNum,
+                poem.Word,
+                poem.Meaning,
+                poem.IsDel
+            }, taskId);
             return true;
         }
 
@@ -107,7 +123,15 @@ namespace 家谱.Services
 
             poem.IsDel = true;
             await _context.SaveChangesAsync();
-            await _auditLogService.WriteAsync("Geno_Generation_Poems", poem.PoemID, "DELETE", operatorUserId, before, taskId);
+            await _auditLogService.WriteAsync("Geno_Generation_Poems", poem.PoemID, "DELETE", operatorUserId, before, new
+            {
+                poem.PoemID,
+                poem.TreeID,
+                poem.GenerationNum,
+                poem.Word,
+                poem.Meaning,
+                poem.IsDel
+            }, taskId);
             return true;
         }
     }

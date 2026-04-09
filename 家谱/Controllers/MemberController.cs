@@ -10,32 +10,38 @@ using 家谱.Services;
 
 namespace 家谱.Controllers
 {
+    /// <summary>
+    /// 家谱成员控制器。
+    /// </summary>
     [Authorize]
     [ApiController]
     [Route("api/[controller]")]
-    public class PoemController : ControllerBase
+    public class MemberController : ControllerBase
     {
-        private readonly IGenoPoemService _poemService;
-        private readonly IGenoTreeService _genoTreeService;
+        private readonly IGenoMemberService _memberService;
+        private readonly IGenoTreeService _treeService;
         private readonly IReviewService _reviewService;
         private readonly ITreePermissionService _treePermissionService;
 
-        public PoemController(
-            IGenoPoemService poemService,
-            IGenoTreeService genoTreeService,
+        public MemberController(
+            IGenoMemberService memberService,
+            IGenoTreeService treeService,
             IReviewService reviewService,
             ITreePermissionService treePermissionService)
         {
-            _poemService = poemService;
-            _genoTreeService = genoTreeService;
+            _memberService = memberService;
+            _treeService = treeService;
             _reviewService = reviewService;
             _treePermissionService = treePermissionService;
         }
 
+        /// <summary>
+        /// 获取树成员列表。
+        /// </summary>
         [HttpGet("tree/{treeId}")]
         public async Task<IActionResult> GetList(Guid treeId)
         {
-            var tree = await _genoTreeService.GetByIdAsync(treeId) ?? throw new KeyNotFoundException("家谱树不存在");
+            var tree = await _treeService.GetByIdAsync(treeId) ?? throw new KeyNotFoundException("家谱树不存在");
             var currentUserId = GetCurrentUserId();
 
             if (!await _treePermissionService.CanViewTreeAsync(tree, currentUserId))
@@ -43,14 +49,17 @@ namespace 家谱.Controllers
                 throw new UnauthorizedAccessException("无权限访问此资源");
             }
 
-            var list = await _poemService.GetByTreeIdAsync(treeId);
-            return Ok(ApiResponse.OK(list));
+            var members = await _memberService.GetByTreeIdAsync(treeId);
+            return Ok(ApiResponse.OK(members));
         }
 
+        /// <summary>
+        /// 新增树成员。
+        /// </summary>
         [HttpPost("Add")]
-        public async Task<IActionResult> Add([FromBody] PoemDto dto)
+        public async Task<IActionResult> Add([FromBody] GenoMemberDto dto)
         {
-            var tree = await _genoTreeService.GetByIdAsync(dto.TreeId) ?? throw new KeyNotFoundException("家谱树不存在");
+            var tree = await _treeService.GetByIdAsync(dto.TreeId) ?? throw new KeyNotFoundException("家谱树不存在");
             var currentUserId = GetCurrentUserId();
 
             if (!await _treePermissionService.CanViewTreeAsync(tree, currentUserId))
@@ -60,21 +69,21 @@ namespace 家谱.Controllers
 
             if (GetCurrentUserRole() == (byte)RoleType.SuperAdmin || await _treePermissionService.CanEditTreeAsync(tree.TreeID, currentUserId))
             {
-                var poem = await _poemService.CreateAsync(dto, currentUserId);
+                var member = await _memberService.CreateAsync(dto, currentUserId);
                 return Ok(ApiResponse.OK(new WorkflowResultDto
                 {
                     AppliedDirectly = true,
-                    Message = "字辈添加成功",
-                    Data = new { poemId = poem.PoemID }
+                    Message = "树成员添加成功",
+                    Data = new { memberId = member.MemberID }
                 }));
             }
 
             var taskId = await _reviewService.SubmitAsync(new SubmitReviewRequest
             {
                 TreeId = dto.TreeId,
-                ActionCode = ReviewActions.PoemCreate,
+                ActionCode = ReviewActions.MemberCreate,
                 ChangeData = JsonSerializer.Serialize(dto, JsonDefaults.Options),
-                Reason = "普通用户提交新增字辈申请",
+                Reason = "普通用户提交新增树成员申请",
                 ForceCreateTask = true
             }, currentUserId);
 
@@ -82,14 +91,23 @@ namespace 家谱.Controllers
             {
                 SubmittedForReview = true,
                 TaskId = taskId,
-                Message = "新增字辈申请已提交，等待审核"
+                Message = "新增成员申请已提交，等待树拥有者或树管理员审核"
             }));
         }
 
-        [HttpPut("Update")]
-        public async Task<IActionResult> Update([FromBody] PoemDto dto, Guid poemId)
+        /// <summary>
+        /// 修改树成员。
+        /// </summary>
+        [HttpPut("Update/{id}")]
+        public async Task<IActionResult> Update(Guid id, [FromBody] GenoMemberDto dto)
         {
-            var tree = await _genoTreeService.GetByIdAsync(dto.TreeId) ?? throw new KeyNotFoundException("家谱树不存在");
+            var member = await _memberService.GetByIdAsync(id) ?? throw new KeyNotFoundException("树成员不存在");
+            if (member.TreeID != dto.TreeId)
+            {
+                throw new ArgumentException("不允许跨家谱树修改成员");
+            }
+
+            var tree = await _treeService.GetByIdAsync(dto.TreeId) ?? throw new KeyNotFoundException("家谱树不存在");
             var currentUserId = GetCurrentUserId();
 
             if (!await _treePermissionService.CanViewTreeAsync(tree, currentUserId))
@@ -97,49 +115,46 @@ namespace 家谱.Controllers
                 throw new UnauthorizedAccessException("无权限访问此资源");
             }
 
-            var poem = await _poemService.GetByIdAsync(poemId) ?? throw new KeyNotFoundException("字辈不存在");
-            if (poem.TreeID != dto.TreeId)
-            {
-                throw new ArgumentException("不允许修改树ID，必须在同一棵树内修改");
-            }
-
             if (GetCurrentUserRole() == (byte)RoleType.SuperAdmin || await _treePermissionService.CanEditTreeAsync(tree.TreeID, currentUserId))
             {
-                var success = await _poemService.UpdateAsync(dto, poemId, currentUserId);
+                var success = await _memberService.UpdateAsync(id, dto, currentUserId);
                 if (!success)
                 {
-                    throw new Exception("字辈更新失败");
+                    throw new InvalidOperationException("树成员更新失败");
                 }
 
                 return Ok(ApiResponse.OK(new WorkflowResultDto
                 {
                     AppliedDirectly = true,
-                    Message = "字辈已更新"
+                    Message = "树成员已更新"
                 }));
             }
 
             var taskId = await _reviewService.SubmitAsync(new SubmitReviewRequest
             {
                 TreeId = dto.TreeId,
-                TargetId = poemId,
-                ActionCode = ReviewActions.PoemUpdate,
+                TargetId = id,
+                ActionCode = ReviewActions.MemberUpdate,
                 ChangeData = JsonSerializer.Serialize(dto, JsonDefaults.Options),
-                Reason = "普通用户提交字辈修改申请"
+                Reason = "普通用户提交树成员修改申请"
             }, currentUserId);
 
             return Ok(ApiResponse.OK(new WorkflowResultDto
             {
                 SubmittedForReview = true,
                 TaskId = taskId,
-                Message = "字辈修改申请已提交，等待审核"
+                Message = "成员修改申请已提交，等待树拥有者或树管理员审核"
             }));
         }
 
+        /// <summary>
+        /// 删除树成员。
+        /// </summary>
         [HttpDelete("Del/{id}")]
         public async Task<IActionResult> Delete(Guid id)
         {
-            var poem = await _poemService.GetByIdAsync(id) ?? throw new KeyNotFoundException("字辈不存在");
-            var tree = await _genoTreeService.GetByIdAsync(poem.TreeID) ?? throw new KeyNotFoundException("家谱树不存在");
+            var member = await _memberService.GetByIdAsync(id) ?? throw new KeyNotFoundException("树成员不存在");
+            var tree = await _treeService.GetByIdAsync(member.TreeID) ?? throw new KeyNotFoundException("家谱树不存在");
             var currentUserId = GetCurrentUserId();
 
             if (!await _treePermissionService.CanViewTreeAsync(tree, currentUserId))
@@ -149,40 +164,44 @@ namespace 家谱.Controllers
 
             if (GetCurrentUserRole() == (byte)RoleType.SuperAdmin || await _treePermissionService.CanEditTreeAsync(tree.TreeID, currentUserId))
             {
-                var success = await _poemService.DeleteAsync(id, currentUserId);
+                var success = await _memberService.DeleteAsync(id, currentUserId);
                 if (!success)
                 {
-                    throw new Exception("字辈删除失败");
+                    throw new InvalidOperationException("树成员删除失败");
                 }
 
                 return Ok(ApiResponse.OK(new WorkflowResultDto
                 {
                     AppliedDirectly = true,
-                    Message = "字辈删除成功"
+                    Message = "树成员已删除"
                 }));
             }
 
             var taskId = await _reviewService.SubmitAsync(new SubmitReviewRequest
             {
-                TreeId = tree.TreeID,
+                TreeId = member.TreeID,
                 TargetId = id,
-                ActionCode = ReviewActions.PoemDelete,
+                ActionCode = ReviewActions.MemberDelete,
                 ChangeData = JsonSerializer.Serialize(new
                 {
-                    poem.PoemID,
-                    poem.TreeID,
-                    poem.GenerationNum,
-                    poem.Word,
-                    poem.Meaning
+                    member.MemberID,
+                    member.TreeID,
+                    member.LastName,
+                    member.FirstName,
+                    member.GenerationNum,
+                    member.PoemID,
+                    member.Gender,
+                    member.BirthDateRaw,
+                    member.Biography
                 }, JsonDefaults.Options),
-                Reason = "普通用户提交字辈删除申请"
+                Reason = "普通用户提交树成员删除申请"
             }, currentUserId);
 
             return Ok(ApiResponse.OK(new WorkflowResultDto
             {
                 SubmittedForReview = true,
                 TaskId = taskId,
-                Message = "字辈删除申请已提交，等待审核"
+                Message = "成员删除申请已提交，等待树拥有者或树管理员审核"
             }));
         }
 

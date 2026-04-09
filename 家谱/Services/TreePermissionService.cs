@@ -6,23 +6,50 @@ using 家谱.Models.Enums;
 
 namespace 家谱.Services
 {
+    /// <summary>
+    /// 树权限服务接口。
+    /// </summary>
     public interface ITreePermissionService
     {
+        /// <summary>
+        /// 获取指定用户对树的访问能力。
+        /// </summary>
         Task<TreeAccessDto> GetTreeAccessAsync(Guid treeId, Guid userId);
 
+        /// <summary>
+        /// 判断用户是否可以查看树。
+        /// </summary>
         Task<bool> CanViewTreeAsync(GenoTree tree, Guid userId);
 
+        /// <summary>
+        /// 判断用户是否可以直接编辑树内容。
+        /// </summary>
         Task<bool> CanEditTreeAsync(Guid treeId, Guid userId);
 
+        /// <summary>
+        /// 判断用户是否可以审核任务。
+        /// </summary>
         Task<bool> CanReviewTaskAsync(ReviewTask task, Guid userId);
 
+        /// <summary>
+        /// 获取树内已授权成员列表。
+        /// </summary>
         Task<List<TreePermissionDto>> GetPermissionsAsync(Guid treeId);
 
+        /// <summary>
+        /// 新增或更新树内权限。
+        /// </summary>
         Task<GenoTreePermission> UpsertPermissionAsync(Guid treeId, Guid userId, byte roleType, Guid? grantedBy);
 
+        /// <summary>
+        /// 获取用户可访问的树列表。
+        /// </summary>
         Task<List<GenoTree>> GetAccessibleTreesAsync(Guid userId);
     }
 
+    /// <summary>
+    /// 树权限服务实现。
+    /// </summary>
     public class TreePermissionService : ITreePermissionService
     {
         private readonly GenealogyDbContext _db;
@@ -36,6 +63,7 @@ namespace 家谱.Services
         {
             var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.UserID == userId && u.UserStatus == 1)
                 ?? throw new Exception("用户不存在");
+
             var tree = await _db.GenoTrees.AsNoTracking().FirstOrDefaultAsync(t => t.TreeID == treeId && !t.IsDel)
                 ?? throw new Exception("家谱树不存在");
 
@@ -43,30 +71,24 @@ namespace 家谱.Services
             var isOwner = tree.OwnerID == userId;
 
             byte? roleType = null;
-            if (isOwner)
-            {
-                roleType = (byte)TreeRoleType.Admin;
-            }
-            else
+            if (!isOwner)
             {
                 roleType = await _db.TreePermissions
-                    .Where(p => p.TreeID == treeId && p.UserID == userId && p.IsActive)
-                    .Select(p => (byte?)p.RoleType)
+                    .AsNoTracking()
+                    .Where(permission => permission.TreeID == treeId && permission.UserID == userId && permission.IsActive)
+                    .Select(permission => (byte?)permission.RoleType)
                     .FirstOrDefaultAsync();
             }
-
-            var canEdit = isSuperAdmin || roleType is (byte)TreeRoleType.Admin or (byte)TreeRoleType.Editor;
-            var canManagePermissions = isSuperAdmin || roleType == (byte)TreeRoleType.Admin;
 
             return new TreeAccessDto
             {
                 IsSuperAdmin = isSuperAdmin,
                 IsOwner = isOwner,
-                RoleType = roleType,
-                RoleName = GetTreeRoleName(roleType, isOwner, isSuperAdmin),
-                CanEdit = canEdit,
-                CanReview = canEdit,
-                CanManagePermissions = canManagePermissions
+                RoleType = isOwner ? (byte)TreeRoleType.Admin : roleType,
+                RoleName = GetTreeRoleName(isSuperAdmin, isOwner, roleType),
+                CanEdit = isSuperAdmin || isOwner || roleType is (byte)TreeRoleType.Admin or (byte)TreeRoleType.Editor,
+                CanReview = isSuperAdmin || isOwner || roleType == (byte)TreeRoleType.Admin,
+                CanManagePermissions = isSuperAdmin || isOwner || roleType == (byte)TreeRoleType.Admin
             };
         }
 
@@ -89,23 +111,26 @@ namespace 家谱.Services
 
         public async Task<bool> CanReviewTaskAsync(ReviewTask task, Guid userId)
         {
-            var reviewer = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.UserID == userId && u.UserStatus == 1);
+            var reviewer = await _db.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(user => user.UserID == userId && user.UserStatus == 1);
+
             if (reviewer == null)
             {
                 return false;
             }
 
-            if (reviewer.RoleType == (byte)RoleType.SuperAdmin)
+            if (task.ActionCode == ReviewActions.ApplyAdmin)
             {
-                return true;
+                return reviewer.RoleType == (byte)RoleType.SuperAdmin;
             }
 
-            if (task.ActionCode == ReviewActions.ApplyAdmin || task.ActionCode == ReviewActions.TreeCreate)
+            if (task.ActionCode == ReviewActions.TreeCreate)
             {
-                return false;
+                return reviewer.RoleType is (byte)RoleType.SuperAdmin or (byte)RoleType.Admin;
             }
 
-            if (task.TreeID == null)
+            if (!task.TreeID.HasValue)
             {
                 return false;
             }
@@ -124,34 +149,34 @@ namespace 家谱.Services
             var tree = await _db.GenoTrees.AsNoTracking().FirstOrDefaultAsync(t => t.TreeID == treeId && !t.IsDel)
                 ?? throw new Exception("家谱树不存在");
 
-            var explicitPermissions = await _db.TreePermissions
+            var permissions = await _db.TreePermissions
                 .AsNoTracking()
-                .Where(p => p.TreeID == treeId && p.IsActive)
-                .Include(p => p.User)
-                .Select(p => new TreePermissionDto
+                .Where(permission => permission.TreeID == treeId && permission.IsActive)
+                .Include(permission => permission.User)
+                .Select(permission => new TreePermissionDto
                 {
-                    PermissionId = p.PermissionID,
-                    UserId = p.UserID,
-                    Username = p.User.Username,
-                    RoleType = p.RoleType,
-                    RoleName = ReviewActions.GetRoleDisplayName(p.RoleType),
-                    Email = p.User.Email,
-                    Phone = p.User.Phone,
-                    GrantedAt = p.GrantedAt,
+                    PermissionId = permission.PermissionID,
+                    UserId = permission.UserID,
+                    Username = permission.User.Username,
+                    RoleType = permission.RoleType,
+                    RoleName = ReviewActions.GetTreeRoleDisplayName(permission.RoleType),
+                    Email = permission.User.Email,
+                    Phone = permission.User.Phone,
+                    GrantedAt = permission.GrantedAt,
                     IsOwner = false
                 })
                 .ToListAsync();
 
-            var owner = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.UserID == tree.OwnerID);
-            if (owner != null && explicitPermissions.All(p => p.UserId != owner.UserID))
+            var owner = await _db.Users.AsNoTracking().FirstOrDefaultAsync(user => user.UserID == tree.OwnerID && user.UserStatus == 1);
+            if (owner != null && permissions.All(permission => permission.UserId != owner.UserID))
             {
-                explicitPermissions.Insert(0, new TreePermissionDto
+                permissions.Insert(0, new TreePermissionDto
                 {
                     PermissionId = Guid.Empty,
                     UserId = owner.UserID,
                     Username = owner.Username,
                     RoleType = (byte)TreeRoleType.Admin,
-                    RoleName = "树管理员",
+                    RoleName = "树拥有者",
                     Email = owner.Email,
                     Phone = owner.Phone,
                     GrantedAt = tree.CreateTime,
@@ -159,13 +184,13 @@ namespace 家谱.Services
                 });
             }
 
-            return explicitPermissions;
+            return permissions;
         }
 
         public async Task<GenoTreePermission> UpsertPermissionAsync(Guid treeId, Guid userId, byte roleType, Guid? grantedBy)
         {
             var existing = await _db.TreePermissions
-                .FirstOrDefaultAsync(p => p.TreeID == treeId && p.UserID == userId);
+                .FirstOrDefaultAsync(permission => permission.TreeID == treeId && permission.UserID == userId);
 
             if (existing == null)
             {
@@ -180,6 +205,7 @@ namespace 家谱.Services
                     UpdatedAt = DateTime.UtcNow,
                     IsActive = true
                 };
+
                 _db.TreePermissions.Add(existing);
             }
             else
@@ -199,20 +225,25 @@ namespace 家谱.Services
         {
             var ownerTrees = await _db.GenoTrees
                 .AsNoTracking()
-                .Where(t => !t.IsDel && t.OwnerID == userId)
+                .Where(tree => !tree.IsDel && tree.OwnerID == userId)
+                .OrderByDescending(tree => tree.CreateTime)
                 .ToListAsync();
 
             var treeIds = await _db.TreePermissions
                 .AsNoTracking()
-                .Where(p => p.UserID == userId && p.IsActive)
-                .Select(p => p.TreeID)
+                .Where(permission => permission.UserID == userId && permission.IsActive)
+                .Select(permission => permission.TreeID)
+                .Distinct()
                 .ToListAsync();
 
             var permissionTrees = new List<GenoTree>();
-            foreach (var treeId in treeIds.Distinct())
+            foreach (var treeId in treeIds)
             {
-                var tree = await _db.GenoTrees.AsNoTracking().FirstOrDefaultAsync(t => t.TreeID == treeId && !t.IsDel);
-                if (tree != null && ownerTrees.All(t => t.TreeID != tree.TreeID))
+                var tree = await _db.GenoTrees
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(item => item.TreeID == treeId && !item.IsDel);
+
+                if (tree != null && ownerTrees.All(item => item.TreeID != tree.TreeID))
                 {
                     permissionTrees.Add(tree);
                 }
@@ -220,21 +251,22 @@ namespace 家谱.Services
 
             var trees = ownerTrees
                 .Concat(permissionTrees)
-                .OrderByDescending(t => t.CreateTime)
+                .OrderByDescending(tree => tree.CreateTime)
                 .ToList();
 
             foreach (var tree in trees)
             {
                 tree.Poems = await _db.GenoGenerationPoems
-                    .Where(p => !p.IsDel && p.TreeID == tree.TreeID)
-                    .OrderBy(p => p.GenerationNum)
+                    .AsNoTracking()
+                    .Where(poem => poem.TreeID == tree.TreeID && !poem.IsDel)
+                    .OrderBy(poem => poem.GenerationNum)
                     .ToListAsync();
             }
 
             return trees;
         }
 
-        private static string GetTreeRoleName(byte? roleType, bool isOwner, bool isSuperAdmin)
+        private static string GetTreeRoleName(bool isSuperAdmin, bool isOwner, byte? roleType)
         {
             if (isSuperAdmin)
             {
@@ -243,7 +275,7 @@ namespace 家谱.Services
 
             if (isOwner)
             {
-                return "树管理员";
+                return "树拥有者";
             }
 
             return roleType switch

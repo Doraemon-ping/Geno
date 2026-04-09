@@ -1,17 +1,15 @@
-﻿namespace 家谱.Middleware
+namespace 家谱.Middleware
 {
     using System.Net;
     using System.Text.Json;
+    using 家谱.Models.DTOs.Common;
 
     public class ExceptionMiddleware
     {
-        // 这是一个全局异常处理中间件，用于捕获未处理的异常并返回统一的错误响应
-
         private readonly RequestDelegate _next;
-
         private readonly ILogger<ExceptionMiddleware> _logger;
 
-        private static readonly JsonSerializerOptions _jsonOptions = new JsonSerializerOptions
+        private static readonly JsonSerializerOptions JsonOptions = new()
         {
             Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase
@@ -27,11 +25,11 @@
         {
             try
             {
-                await _next(context); // 继续执行后面的 Pipeline
+                await _next(context);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "捕获到未处理的异常"); // 记录日志
+                _logger.LogError(ex, "捕获到未处理的异常");
                 await HandleExceptionAsync(context, ex);
             }
         }
@@ -42,21 +40,21 @@
             {
                 ArgumentException => (int)HttpStatusCode.BadRequest,
                 UnauthorizedAccessException => (int)HttpStatusCode.Unauthorized,
+                KeyNotFoundException => (int)HttpStatusCode.NotFound,
                 _ => (int)HttpStatusCode.InternalServerError
             };
 
-            context.Response.ContentType = "application/json; charset=utf-8"; // 明确指定 UTF-8
+            context.Response.ContentType = "application/json; charset=utf-8";
             context.Response.StatusCode = statusCode;
 
-            var response = new ErrorResponse
+            var response = new ApiResponse
             {
                 Code = statusCode,
-                Message = exception.Message
+                Message = exception.Message,
+                Data = null!
             };
 
-            // 配置：不进行 Unicode 编码，并使用小驼峰
-
-            var json = JsonSerializer.Serialize(response, _jsonOptions);
+            var json = JsonSerializer.Serialize(response, JsonOptions);
             await context.Response.WriteAsync(json);
         }
     }

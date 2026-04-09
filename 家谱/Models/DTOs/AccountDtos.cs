@@ -139,4 +139,46 @@
         public string? Email { get; set; }
     }
 
+    /// <summary>
+    /// 系统用户搜索结果。
+    /// </summary>
+    public class UserLookupDto
+    {
+        /// <summary>
+        /// 用户标识。
+        /// </summary>
+        public Guid UserId { get; set; }
+
+        /// <summary>
+        /// 用户名。
+        /// </summary>
+        public string Username { get; set; } = string.Empty;
+
+        /// <summary>
+        /// 邮箱。
+        /// </summary>
+        public string? Email { get; set; }
+
+        /// <summary>
+        /// 电话。
+        /// </summary>
+        public string? Phone { get; set; }
+
+        /// <summary>
+        /// 角色类型。
+        /// </summary>
+        public byte RoleType { get; set; }
+
+        /// <summary>
+        /// 角色名称。
+        /// </summary>
+        public string RoleName => RoleType switch
+        {
+            0 => "超级管理员",
+            1 => "管理员",
+            2 => "修谱员",
+            _ => "访客"
+        };
+    }
+
 }

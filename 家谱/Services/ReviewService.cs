@@ -9,50 +9,65 @@ using 家谱.Services.Common;
 
 namespace 家谱.Services
 {
+    /// <summary>
+    /// 审核服务接口。
+    /// </summary>
     public interface IReviewService
     {
         Task<Guid> SubmitAsync(SubmitReviewRequest dto, Guid submitterId);
 
-        Task ApproveAsync(Guid taskId, Guid reviewerId, string notes, int action);
+        Task<WorkflowResultDto> ProcessAsync(TaskProcessDto dto, Guid reviewerId);
 
         Task<List<TaskDtos>> GetTaskList(Guid userId);
 
         Task<List<TaskDtos>> GetAll(Guid userId);
     }
 
+    /// <summary>
+    /// 审核服务。
+    /// </summary>
     public class ReviewService : IReviewService
     {
         private readonly GenealogyDbContext _db;
         private readonly IHandleTasks _handler;
         private readonly ITreePermissionService _treePermissionService;
+        private readonly IAuditLogService _auditLogService;
 
-        public ReviewService(GenealogyDbContext db, IHandleTasks handleTasks, ITreePermissionService treePermissionService)
+        public ReviewService(
+            GenealogyDbContext db,
+            IHandleTasks handleTasks,
+            ITreePermissionService treePermissionService,
+            IAuditLogService auditLogService)
         {
             _db = db;
             _handler = handleTasks;
             _treePermissionService = treePermissionService;
+            _auditLogService = auditLogService;
         }
 
+        /// <summary>
+        /// 提交审核任务。
+        /// </summary>
         public async Task<Guid> SubmitAsync(SubmitReviewRequest dto, Guid submitterId)
         {
-            IQueryable<ReviewTask> duplicateQuery = _db.ReviewTasks.Where(t =>
-                t.SubmitterID == submitterId &&
-                t.ActionCode == dto.ActionCode &&
-                t.Status == (byte)ReviewStatus.Pending);
+            IQueryable<ReviewTask> duplicateQuery = _db.ReviewTasks.Where(task =>
+                task.SubmitterID == submitterId &&
+                task.ActionCode == dto.ActionCode &&
+                task.Status == (byte)ReviewStatus.Pending);
 
             if (dto.TargetId.HasValue)
             {
-                duplicateQuery = duplicateQuery.Where(t => t.TargetID == dto.TargetId);
+                duplicateQuery = duplicateQuery.Where(task => task.TargetID == dto.TargetId);
             }
 
             if (dto.TreeId.HasValue)
             {
-                duplicateQuery = duplicateQuery.Where(t => t.TreeID == dto.TreeId);
+                duplicateQuery = duplicateQuery.Where(task => task.TreeID == dto.TreeId);
             }
 
             if (!dto.ForceCreateTask && await duplicateQuery.AnyAsync())
             {
-                throw new Exception("您已提交过同类待审核申请，请等待审核结果");
+                throw new InvalidOperationException("你已提交过同类型待审核申请，请等待审核结果");
             }
 
             var task = new ReviewTask
@@ -69,62 +84,53 @@ namespace 家谱.Services
 
             _db.ReviewTasks.Add(task);
             await _db.SaveChangesAsync();
+
+            await _auditLogService.WriteAsync(
+                "Sys_Review_Tasks",
+                task.TaskID,
+                "CREATE",
+                submitterId,
+                new { },
+                BuildTaskLogSnapshot(task),
+                task.TaskID);
+
             return task.TaskID;
         }
 
-        public async Task ApproveAsync(Guid taskId, Guid reviewerId, string notes, int action)
+        /// <summary>
+        /// 处理审核任务。
+        /// </summary>
+        public async Task<WorkflowResultDto> ProcessAsync(TaskProcessDto dto, Guid reviewerId)
         {
-            var task = await _db.ReviewTasks.FirstOrDefaultAsync(t => t.TaskID == taskId);
+            if (dto.TaskId == Guid.Empty)
+            {
+                throw new ArgumentException("审核任务不能为空");
+            }
+
+            if (dto.Action is not (int)ReviewProcessAction.Approve and not (int)ReviewProcessAction.Reject)
+            {
+                throw new ArgumentException("无效的审核操作");
+            }
+
+            var task = await _db.ReviewTasks.FirstOrDefaultAsync(item => item.TaskID == dto.TaskId);
             if (task == null || task.Status != (byte)ReviewStatus.Pending)
             {
-                throw new Exception("任务不存在或已处理");
+                throw new InvalidOperationException("任务不存在或已处理");
             }
 
             if (!await _treePermissionService.CanReviewTaskAsync(task, reviewerId))
             {
-                throw new Exception("无权限处理该审核任务");
+                throw new UnauthorizedAccessException("无权处理该审核任务");
             }
 
-            if (action != 1 && action != 2)
-            {
-                throw new Exception("无效的审核动作");
-            }
+            var before = BuildTaskLogSnapshot(task);
 
             using var transaction = await _db.Database.BeginTransactionAsync();
             try
             {
-                if (action == 1)
+                if (dto.Action == (int)ReviewProcessAction.Approve)
                 {
-                    switch (task.ActionCode)
-                    {
-                        case ReviewActions.ApplyAdmin:
-                            await _handler.HandleApplyAdminAsync(task, reviewerId);
-                            break;
-                        case ReviewActions.TreeApplyRole:
-                            await _handler.HandleTreeApplyRoleAsync(task, reviewerId);
-                            break;
-                        case ReviewActions.TreeCreate:
-                            await _handler.HandleTreeCreateAsync(task, reviewerId);
-                            break;
-                        case ReviewActions.TreeUpdate:
-                            await _handler.HandleTreeUpdateAsync(task, reviewerId);
-                            break;
-                        case ReviewActions.TreeDelete:
-                            await _handler.HandleTreeDeleteAsync(task, reviewerId);
-                            break;
-                        case ReviewActions.PoemCreate:
-                            await _handler.HandlePoemCreateAsync(task, reviewerId);
-                            break;
-                        case ReviewActions.PoemUpdate:
-                            await _handler.HandlePoemUpdateAsync(task, reviewerId);
-                            break;
-                        case ReviewActions.PoemDelete:
-                            await _handler.HandlePoemDeleteAsync(task, reviewerId);
-                            break;
-                        default:
-                            throw new Exception($"未定义的业务操作: {task.ActionCode}");
-                    }
-
+                    await ExecuteApprovedTaskAsync(task, reviewerId);
                     task.Status = (byte)ReviewStatus.Approved;
                 }
                 else
@@ -133,11 +139,32 @@ namespace 家谱.Services
                 }
 
                 task.ReviewerID = reviewerId;
-                task.ReviewNotes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+                task.ReviewNotes = string.IsNullOrWhiteSpace(dto.Notes) ? null : dto.Notes.Trim();
                 task.ProcessedAt = DateTime.UtcNow;
 
                 await _db.SaveChangesAsync();
+
+                await _auditLogService.WriteAsync(
+                    "Sys_Review_Tasks",
+                    task.TaskID,
+                    "UPDATE",
+                    reviewerId,
+                    before,
+                    BuildTaskLogSnapshot(task),
+                    task.TaskID);
+
                 await transaction.CommitAsync();
+
+                return new WorkflowResultDto
+                {
+                    Message = dto.Action == (int)ReviewProcessAction.Approve ? "审核通过并已执行" : "审核已驳回",
+                    Data = new
+                    {
+                        taskId = task.TaskID,
+                        status = task.Status,
+                        processedAt = task.ProcessedAt
+                    }
+                };
             }
             catch
             {
@@ -146,18 +173,21 @@ namespace 家谱.Services
             }
         }
 
+        /// <summary>
+        /// 获取当前用户提交或处理过的任务。
+        /// </summary>
         public async Task<List<TaskDtos>> GetTaskList(Guid userId)
         {
-            var userExists = await _db.Users.AnyAsync(u => u.UserID == userId && u.UserStatus == 1);
+            var userExists = await _db.Users.AnyAsync(user => user.UserID == userId && user.UserStatus == 1);
             if (!userExists)
             {
-                throw new Exception("用户不存在");
+                throw new KeyNotFoundException("用户不存在");
             }
 
             var tasks = await _db.ReviewTasks
                 .AsNoTracking()
-                .Where(t => t.SubmitterID == userId || t.ReviewerID == userId)
-                .OrderByDescending(t => t.CreatedAt)
+                .Where(task => task.SubmitterID == userId || task.ReviewerID == userId)
+                .OrderByDescending(task => task.CreatedAt)
                 .ToListAsync();
 
             var result = new List<TaskDtos>(tasks.Count);
@@ -169,18 +199,24 @@ namespace 家谱.Services
             return result;
         }
 
+        /// <summary>
+        /// 获取当前用户可处理的待审核任务。
+        /// </summary>
         public async Task<List<TaskDtos>> GetAll(Guid userId)
         {
-            var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.UserID == userId && u.UserStatus == 1);
+            var user = await _db.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(item => item.UserID == userId && item.UserStatus == 1);
+
             if (user == null)
             {
-                throw new Exception("用户不存在");
+                throw new KeyNotFoundException("用户不存在");
             }
 
             var tasks = await _db.ReviewTasks
                 .AsNoTracking()
-                .Where(t => t.Status == (byte)ReviewStatus.Pending)
-                .OrderByDescending(t => t.CreatedAt)
+                .Where(task => task.Status == (byte)ReviewStatus.Pending)
+                .OrderByDescending(task => task.CreatedAt)
                 .ToListAsync();
 
             var result = new List<TaskDtos>();
@@ -197,21 +233,76 @@ namespace 家谱.Services
             return result;
         }
 
+        private async Task ExecuteApprovedTaskAsync(ReviewTask task, Guid reviewerId)
+        {
+            switch (task.ActionCode)
+            {
+                case ReviewActions.ApplyAdmin:
+                    await _handler.HandleApplyAdminAsync(task, reviewerId);
+                    break;
+                case ReviewActions.TreeApplyRole:
+                    await _handler.HandleTreeApplyRoleAsync(task, reviewerId);
+                    break;
+                case ReviewActions.TreeCreate:
+                    await _handler.HandleTreeCreateAsync(task, reviewerId);
+                    break;
+                case ReviewActions.TreeUpdate:
+                    await _handler.HandleTreeUpdateAsync(task, reviewerId);
+                    break;
+                case ReviewActions.TreeDelete:
+                    await _handler.HandleTreeDeleteAsync(task, reviewerId);
+                    break;
+                case ReviewActions.PoemCreate:
+                    await _handler.HandlePoemCreateAsync(task, reviewerId);
+                    break;
+                case ReviewActions.PoemUpdate:
+                    await _handler.HandlePoemUpdateAsync(task, reviewerId);
+                    break;
+                case ReviewActions.PoemDelete:
+                    await _handler.HandlePoemDeleteAsync(task, reviewerId);
+                    break;
+                case ReviewActions.MemberCreate:
+                    await _handler.HandleMemberCreateAsync(task, reviewerId);
+                    break;
+                case ReviewActions.MemberUpdate:
+                    await _handler.HandleMemberUpdateAsync(task, reviewerId);
+                    break;
+                case ReviewActions.MemberDelete:
+                    await _handler.HandleMemberDeleteAsync(task, reviewerId);
+                    break;
+                case ReviewActions.UnionCreate:
+                    await _handler.HandleUnionCreateAsync(task, reviewerId);
+                    break;
+                case ReviewActions.UnionDelete:
+                    await _handler.HandleUnionDeleteAsync(task, reviewerId);
+                    break;
+                case ReviewActions.UnionMemberAdd:
+                    await _handler.HandleUnionMemberAddAsync(task, reviewerId);
+                    break;
+                case ReviewActions.UnionMemberDelete:
+                    await _handler.HandleUnionMemberDeleteAsync(task, reviewerId);
+                    break;
+                default:
+                    throw new InvalidOperationException($"未定义的业务操作：{task.ActionCode}");
+            }
+        }
+
         private async Task<TaskDtos> MapTaskDtoAsync(ReviewTask task, Guid currentUserId, bool? canProcessOverride = null)
         {
             var changeData = DeserializeJson(task.ChangeData);
             var submitter = await BuildUserSummaryAsync(task.SubmitterID);
             var reviewer = task.ReviewerID.HasValue ? await BuildUserSummaryAsync(task.ReviewerID.Value) : null;
-            var treeSummary = task.TreeID.HasValue ? await BuildTreeSummaryAsync(task.TreeID.Value) : BuildTreeSummaryFromPayload(task.ActionCode, changeData);
+            var treeSummary = task.TreeID.HasValue
+                ? await BuildTreeSummaryAsync(task.TreeID.Value) ?? BuildTreeSummaryFromPayload(task.ActionCode, changeData)
+                : BuildTreeSummaryFromPayload(task.ActionCode, changeData);
             var targetSummary = await BuildTargetSummaryAsync(task, changeData);
-
             var canProcess = canProcessOverride ?? await _treePermissionService.CanReviewTaskAsync(task, currentUserId);
 
             return new TaskDtos
             {
                 ActionCode = task.ActionCode,
                 TaskId = task.TaskID,
-                SubmitterName = ReadStringProperty(submitter, "username", "未知"),
+                SubmitterName = ReadStringProperty(submitter, "username", "未知用户"),
                 SubmitterId = task.SubmitterID,
                 Submitter = submitter,
                 ActionName = ReviewActions.GetDisplayName(task.ActionCode),
@@ -245,9 +336,16 @@ namespace 家谱.Services
             {
                 ReviewActions.ApplyAdmin or ReviewActions.TreeApplyRole => await BuildUserSummaryAsync(task.TargetID),
                 ReviewActions.TreeCreate => BuildTreeSummaryFromPayload(task.ActionCode, changeData),
-                ReviewActions.TreeUpdate or ReviewActions.TreeDelete => await BuildTreeSummaryAsync(task.TargetID ?? task.TreeID),
+                ReviewActions.TreeUpdate => await BuildTreeSummaryAsync(task.TargetID ?? task.TreeID) ?? BuildTreeSummaryFromPayload(task.ActionCode, changeData),
+                ReviewActions.TreeDelete => BuildTreeSummaryFromPayload(task.ActionCode, changeData) ?? await BuildTreeSummaryAsync(task.TargetID ?? task.TreeID),
                 ReviewActions.PoemCreate => BuildPoemSummaryFromPayload(changeData),
-                ReviewActions.PoemUpdate or ReviewActions.PoemDelete => await BuildPoemSummaryAsync(task.TargetID),
+                ReviewActions.PoemUpdate => await BuildPoemSummaryAsync(task.TargetID) ?? BuildPoemSummaryFromPayload(changeData),
+                ReviewActions.PoemDelete => BuildPoemSummaryFromPayload(changeData) ?? await BuildPoemSummaryAsync(task.TargetID),
+                ReviewActions.MemberCreate or ReviewActions.MemberUpdate or ReviewActions.MemberDelete
+                    => await BuildMemberSummaryAsync(task.TargetID) ?? BuildMemberSummaryFromPayload(changeData),
+                ReviewActions.UnionCreate => BuildUnionSummaryFromPayload(changeData),
+                ReviewActions.UnionDelete => await BuildUnionSummaryAsync(task.TargetID) ?? BuildUnionSummaryFromPayload(changeData),
+                ReviewActions.UnionMemberAdd or ReviewActions.UnionMemberDelete => await BuildMemberSummaryAsync(task.TargetID) ?? BuildMemberSummaryFromPayload(changeData),
                 _ => null
             };
         }
@@ -259,7 +357,10 @@ namespace 家谱.Services
                 return null;
             }
 
-            var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.UserID == userId.Value);
+            var user = await _db.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(item => item.UserID == userId.Value && item.UserStatus == 1);
+
             if (user == null)
             {
                 return null;
@@ -283,7 +384,11 @@ namespace 家谱.Services
                 return null;
             }
 
-            var tree = await _db.GenoTrees.AsNoTracking().FirstOrDefaultAsync(t => t.TreeID == treeId.Value);
+            var tree = await _db.GenoTrees
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(item => item.TreeID == treeId.Value);
+
             if (tree == null)
             {
                 return null;
@@ -303,29 +408,26 @@ namespace 家谱.Services
 
         private static object? BuildTreeSummaryFromPayload(string actionCode, object? payload)
         {
-            if (payload == null)
+            if (payload == null || actionCode is not (ReviewActions.TreeCreate or ReviewActions.TreeUpdate or ReviewActions.TreeDelete))
             {
                 return null;
             }
 
-            if (actionCode is not (ReviewActions.TreeCreate or ReviewActions.TreeUpdate))
-            {
-                return null;
-            }
-
-            var tree = JsonSerializer.Deserialize<GenoTreeDtos>(JsonSerializer.Serialize(payload, JsonDefaults.Options), JsonDefaults.Options);
-            if (tree == null)
+            var element = ToJsonElement(payload);
+            if (element == null)
             {
                 return null;
             }
 
             return new
             {
-                treeName = tree.TreeName,
-                ancestorName = tree.AncestorName,
-                region = tree.Region,
-                description = tree.Description,
-                isPublic = tree.IsPublic
+                treeId = ReadGuid(element.Value, "treeId", "TreeID"),
+                treeName = ReadString(element.Value, "treeName", "TreeName"),
+                ancestorName = ReadString(element.Value, "ancestorName", "AncestorName"),
+                region = ReadString(element.Value, "region", "Region"),
+                description = ReadString(element.Value, "description", "Description"),
+                isPublic = ReadBool(element.Value, "isPublic", "IsPublic"),
+                isDeleted = ReadBool(element.Value, "isDel", "IsDel")
             };
         }
 
@@ -336,7 +438,11 @@ namespace 家谱.Services
                 return null;
             }
 
-            var poem = await _db.GenoGenerationPoems.AsNoTracking().FirstOrDefaultAsync(p => p.PoemID == poemId.Value);
+            var poem = await _db.GenoGenerationPoems
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(item => item.PoemID == poemId.Value);
+
             if (poem == null)
             {
                 return null;
@@ -355,25 +461,165 @@ namespace 家谱.Services
 
         private static object? BuildPoemSummaryFromPayload(object? payload)
         {
-            if (payload == null)
-            {
-                return null;
-            }
-
-            var poem = JsonSerializer.Deserialize<PoemDto>(JsonSerializer.Serialize(payload, JsonDefaults.Options), JsonDefaults.Options);
-            if (poem == null)
+            var element = ToJsonElement(payload);
+            if (element == null)
             {
                 return null;
             }
 
             return new
             {
-                treeId = poem.TreeId,
-                generationNum = poem.GenerationNum,
-                word = poem.Word,
-                meaning = poem.Meaning
+                poemId = ReadGuid(element.Value, "poemId", "PoemID"),
+                treeId = ReadGuid(element.Value, "treeId", "TreeID"),
+                generationNum = ReadInt(element.Value, "generationNum", "GenerationNum"),
+                word = ReadString(element.Value, "word", "Word"),
+                meaning = ReadString(element.Value, "meaning", "Meaning"),
+                isDeleted = ReadBool(element.Value, "isDel", "IsDel")
             };
         }
+
+        private async Task<object?> BuildMemberSummaryAsync(Guid? memberId)
+        {
+            if (memberId == null)
+            {
+                return null;
+            }
+
+            var member = await _db.GenoMembers
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(item => item.MemberID == memberId.Value);
+
+            if (member == null)
+            {
+                return null;
+            }
+
+            return new
+            {
+                memberId = member.MemberID,
+                treeId = member.TreeID,
+                fullName = $"{member.LastName}{member.FirstName}",
+                firstName = member.FirstName,
+                lastName = member.LastName,
+                generationNum = member.GenerationNum,
+                gender = member.Gender,
+                birthDateRaw = member.BirthDateRaw,
+                biography = member.Biography,
+                sysUserId = member.SysUserId,
+                isDeleted = member.IsDel
+            };
+        }
+
+        private static object? BuildMemberSummaryFromPayload(object? payload)
+        {
+            var element = ToJsonElement(payload);
+            if (element == null)
+            {
+                return null;
+            }
+
+            return new
+            {
+                memberId = ReadGuid(element.Value, "memberId", "MemberID"),
+                treeId = ReadGuid(element.Value, "treeId", "TreeID"),
+                fullName = $"{ReadString(element.Value, "lastName", "LastName") ?? string.Empty}{ReadString(element.Value, "firstName", "FirstName") ?? string.Empty}",
+                firstName = ReadString(element.Value, "firstName", "FirstName"),
+                lastName = ReadString(element.Value, "lastName", "LastName"),
+                generationNum = ReadInt(element.Value, "generationNum", "GenerationNum"),
+                gender = ReadInt(element.Value, "gender", "Gender"),
+                birthDateRaw = ReadString(element.Value, "birthDateRaw", "BirthDateRaw"),
+                biography = ReadString(element.Value, "biography", "Biography"),
+                sysUserId = ReadGuid(element.Value, "sysUserId", "SysUserId"),
+                isDeleted = ReadBool(element.Value, "isDel", "IsDel")
+            };
+        }
+
+        private async Task<object?> BuildUnionSummaryAsync(Guid? unionId)
+        {
+            if (unionId == null)
+            {
+                return null;
+            }
+
+            var union = await _db.GenoUnions
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(item => item.UnionID == unionId.Value);
+
+            if (union == null)
+            {
+                return null;
+            }
+
+            var partnerIds = new[] { union.Partner1ID, union.Partner2ID };
+            var partners = await _db.GenoMembers
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .Where(member => partnerIds.Contains(member.MemberID))
+                .ToListAsync();
+
+            var partner1 = partners.FirstOrDefault(member => member.MemberID == union.Partner1ID);
+            var partner2 = partners.FirstOrDefault(member => member.MemberID == union.Partner2ID);
+
+            return new
+            {
+                unionId = union.UnionID,
+                treeId = partner1?.TreeID ?? partner2?.TreeID,
+                partner1Id = union.Partner1ID,
+                partner1Name = partner1 == null ? null : $"{partner1.LastName}{partner1.FirstName}",
+                partner2Id = union.Partner2ID,
+                partner2Name = partner2 == null ? null : $"{partner2.LastName}{partner2.FirstName}",
+                unionType = union.UnionType,
+                unionTypeName = ReviewActions.GetUnionTypeDisplayName(union.UnionType),
+                sortOrder = union.SortOrder,
+                marriageDate = union.MarriageDate,
+                isDeleted = union.IsDel
+            };
+        }
+
+        private static object? BuildUnionSummaryFromPayload(object? payload)
+        {
+            var element = ToJsonElement(payload);
+            if (element == null)
+            {
+                return null;
+            }
+
+            return new
+            {
+                unionId = ReadGuid(element.Value, "unionId", "UnionId"),
+                treeId = ReadGuid(element.Value, "treeId", "TreeId"),
+                partner1Id = ReadGuid(element.Value, "partner1Id", "Partner1Id"),
+                partner1Name = ReadString(element.Value, "partner1Name", "Partner1Name"),
+                partner2Id = ReadGuid(element.Value, "partner2Id", "Partner2Id"),
+                partner2Name = ReadString(element.Value, "partner2Name", "Partner2Name"),
+                unionType = ReadInt(element.Value, "unionType", "UnionType"),
+                unionTypeName = ReadString(element.Value, "unionTypeName", "UnionTypeName"),
+                sortOrder = ReadInt(element.Value, "sortOrder", "SortOrder"),
+                marriageDate = ReadString(element.Value, "marriageDate", "MarriageDate"),
+                relType = ReadInt(element.Value, "relType", "RelType"),
+                relTypeName = ReadString(element.Value, "relTypeName", "RelTypeName"),
+                childOrder = ReadInt(element.Value, "childOrder", "ChildOrder"),
+                childName = ReadString(element.Value, "childName", "ChildName")
+            };
+        }
+
+        private static object BuildTaskLogSnapshot(ReviewTask task) => new
+        {
+            task.TaskID,
+            task.TreeID,
+            task.SubmitterID,
+            task.ActionCode,
+            task.TargetID,
+            changeData = DeserializeJson(task.ChangeData) ?? new { },
+            task.Status,
+            task.ReviewerID,
+            task.ReviewNotes,
+            task.ApplyReason,
+            task.CreatedAt,
+            task.ProcessedAt
+        };
 
         private static object? DeserializeJson(string json)
         {
@@ -387,10 +633,99 @@ namespace 家谱.Services
             }
         }
 
+        private static JsonElement? ToJsonElement(object? source)
+        {
+            if (source == null)
+            {
+                return null;
+            }
+
+            if (source is JsonElement jsonElement)
+            {
+                return jsonElement;
+            }
+
+            try
+            {
+                return JsonSerializer.Deserialize<JsonElement>(
+                    JsonSerializer.Serialize(source, JsonDefaults.Options),
+                    JsonDefaults.Options);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         private static string ReadStringProperty(object? source, string name, string fallback)
         {
             var value = source?.GetType().GetProperty(name)?.GetValue(source)?.ToString();
             return string.IsNullOrWhiteSpace(value) ? fallback : value;
+        }
+
+        private static string? ReadString(JsonElement element, params string[] names)
+        {
+            foreach (var name in names)
+            {
+                if (element.TryGetProperty(name, out var value) && value.ValueKind != JsonValueKind.Null)
+                {
+                    return value.ToString();
+                }
+            }
+
+            return null;
+        }
+
+        private static Guid? ReadGuid(JsonElement element, params string[] names)
+        {
+            var raw = ReadString(element, names);
+            return Guid.TryParse(raw, out var value) ? value : null;
+        }
+
+        private static int? ReadInt(JsonElement element, params string[] names)
+        {
+            foreach (var name in names)
+            {
+                if (!element.TryGetProperty(name, out var value))
+                {
+                    continue;
+                }
+
+                if (value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var intValue))
+                {
+                    return intValue;
+                }
+
+                if (value.ValueKind == JsonValueKind.String && int.TryParse(value.GetString(), out intValue))
+                {
+                    return intValue;
+                }
+            }
+
+            return null;
+        }
+
+        private static bool? ReadBool(JsonElement element, params string[] names)
+        {
+            foreach (var name in names)
+            {
+                if (!element.TryGetProperty(name, out var value))
+                {
+                    continue;
+                }
+
+                if (value.ValueKind is JsonValueKind.True or JsonValueKind.False)
+                {
+                    return value.GetBoolean();
+                }
+
+                if (value.ValueKind == JsonValueKind.String && bool.TryParse(value.GetString(), out var boolValue))
+                {
+                    return boolValue;
+                }
+            }
+
+            return null;
         }
 
         private static string GetTargetType(string actionCode) => actionCode switch
@@ -399,6 +734,9 @@ namespace 家谱.Services
             ReviewActions.TreeApplyRole => "tree-user",
             ReviewActions.TreeCreate or ReviewActions.TreeUpdate or ReviewActions.TreeDelete => "tree",
             ReviewActions.PoemCreate or ReviewActions.PoemUpdate or ReviewActions.PoemDelete => "poem",
+            ReviewActions.MemberCreate or ReviewActions.MemberUpdate or ReviewActions.MemberDelete => "member",
+            ReviewActions.UnionCreate or ReviewActions.UnionDelete => "union",
+            ReviewActions.UnionMemberAdd or ReviewActions.UnionMemberDelete => "union-member",
             _ => "unknown"
         };
     }

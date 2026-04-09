@@ -37,6 +37,12 @@ namespace 家谱.Models.Entities
         public string BeforeData { get; set; } = string.Empty;
 
         /// <summary>
+        /// 变更后的新数据快照 (JSON)。
+        /// </summary>
+        [Required]
+        public string AfterData { get; set; } = string.Empty;
+
+        /// <summary>
         /// 操作类型：UPDATE, DELETE
         /// </summary>
         [MaxLength(20)]

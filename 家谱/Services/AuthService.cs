@@ -10,6 +10,7 @@
     using 家谱.DB;
     using 家谱.Models.DTOs;
     using 家谱.Models.Entities;
+    using 家谱.Models.Enums;
     using 家谱.Setting;
     using BCrypt = BCrypt;
 
@@ -74,6 +75,11 @@
         /// <param name="email">The email<see cref="string"/></param>
         /// <returns>The <see cref="Task{(bool success, string message)}"/></returns>
         Task<(bool success, string message)> SendResetPasswordCodeAsync(string email);
+
+        /// <summary>
+        /// 搜索系统用户。
+        /// </summary>
+        Task<List<UserLookupDto>> SearchUsersAsync(string? keyword, int take = 10);
     }
 
     /// <summary>
@@ -102,6 +108,11 @@
         private readonly JwtSettings _jwtSettings;// 1. 定义私有字段
 
         /// <summary>
+        /// Defines the _auditLogService
+        /// </summary>
+        private readonly IAuditLogService _auditLogService;
+
+        /// <summary>
         /// Initializes a new instance of the <see cref="AuthService"/> class.
         /// </summary>
         /// <param name="context">The context<see cref="GenealogyDbContext"/></param>
@@ -111,11 +122,13 @@
         public AuthService(GenealogyDbContext context,
                             IMailService mailService,
                             IMemoryCache cache,
+                            IAuditLogService auditLogService,
                             IOptions<JwtSettings> settings)
         {
             _context = context;
             _mailService = mailService;
             _cache = cache;
+            _auditLogService = auditLogService;
             _jwtSettings = settings.Value; // 2. 通过构造函数注入配置对象
         }
 
@@ -207,6 +220,17 @@
 
             _context.Users.Add(newUser);
             var IsSave = await _context.SaveChangesAsync();
+
+            if (IsSave > 0)
+            {
+                await _auditLogService.WriteAsync(
+                    "Sys_Users",
+                    newUser.UserID,
+                    "CREATE",
+                    newUser.UserID,
+                    new { },
+                    BuildUserSnapshot(newUser));
+            }
 
             // 5. 发送欢迎邮件 (异步非阻塞)
             if (!string.IsNullOrEmpty(dto.Email) && IsSave > 0)
@@ -302,6 +326,38 @@
             return user;
         }
 
+        /// <summary>
+        /// 搜索系统用户。
+        /// </summary>
+        public async Task<List<UserLookupDto>> SearchUsersAsync(string? keyword, int take = 10)
+        {
+            var query = _context.Users
+                .AsNoTracking()
+                .Where(user => user.UserStatus == 1);
+
+            if (!string.IsNullOrWhiteSpace(keyword))
+            {
+                var normalized = keyword.Trim();
+                query = query.Where(user =>
+                    user.Username.Contains(normalized) ||
+                    (user.Email != null && user.Email.Contains(normalized)) ||
+                    (user.Phone != null && user.Phone.Contains(normalized)));
+            }
+
+            return await query
+                .OrderBy(user => user.Username)
+                .Take(Math.Clamp(take, 1, 20))
+                .Select(user => new UserLookupDto
+                {
+                    UserId = user.UserID,
+                    Username = user.Username,
+                    Email = user.Email,
+                    Phone = user.Phone,
+                    RoleType = user.RoleType
+                })
+                .ToListAsync();
+        }
+
         // 更新用户资料的方法
 
         /// <summary>
@@ -317,6 +373,8 @@
                 return (false, "请先注册");
             if (user.UserStatus == 0)
                 return (false, "账号已被禁用！");
+
+            var before = BuildUserSnapshot(user);
 
             if (!string.IsNullOrWhiteSpace(dto.Username) &&
                 await _context.Users.AnyAsync(u => u.UserID != userId && u.UserStatus == 1 && u.Username == dto.Username))
@@ -345,7 +403,19 @@
             if (!changed)
                 return (false, "未检测到资料变更");
 
-            return (await _context.SaveChangesAsync() > 0, "修改成功");
+            var saved = await _context.SaveChangesAsync() > 0;
+            if (saved)
+            {
+                await _auditLogService.WriteAsync(
+                    "Sys_Users",
+                    user.UserID,
+                    "UPDATE",
+                    userId,
+                    before,
+                    BuildUserSnapshot(user));
+            }
+
+            return (saved, "修改成功");
         }
 
         // 4. 发送重置密码验证码
@@ -400,12 +470,42 @@
             if (user == null) return (false,
             "用户不存在");
 
+            var before = new
+            {
+                user.UserID,
+                user.Username,
+                user.Email,
+                user.Phone,
+                user.RoleType,
+                user.UserStatus,
+                PasswordChanged = false
+            };
+
             // 3. 加密并更新密码 (假设你使用了 BCrypt 或类似的加密)
             user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+            user.UpdatedAt = DateTime.UtcNow;
 
             var result = await _context.SaveChangesAsync();
             if (result > 0)
             {
+                await _auditLogService.WriteAsync(
+                    "Sys_Users",
+                    user.UserID,
+                    "UPDATE",
+                    user.UserID,
+                    before,
+                    new
+                    {
+                        user.UserID,
+                        user.Username,
+                        user.Email,
+                        user.Phone,
+                        user.RoleType,
+                        user.UserStatus,
+                        PasswordChanged = true,
+                        user.UpdatedAt
+                    });
+
                 _cache.Remove($"ResetCode_{email}"); // 成功后清除验证码
                 return (true,
                 "密码重置成功，请重新登录");
@@ -413,6 +513,22 @@
 
             return (false,
             "数据库更新失败");
+        }
+
+        private static object BuildUserSnapshot(SysUser user)
+        {
+            return new
+            {
+                user.UserID,
+                user.Username,
+                user.Email,
+                user.Phone,
+                user.RoleType,
+                RoleName = ReviewActions.GetRoleDisplayName(user.RoleType),
+                user.UserStatus,
+                user.CreatedAt,
+                user.UpdatedAt
+            };
         }
     }
 }

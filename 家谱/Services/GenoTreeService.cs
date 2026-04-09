@@ -54,7 +54,17 @@ namespace 家谱.Services
             await _db.GenoTrees.AddAsync(tree);
             await _db.SaveChangesAsync();
             await _treePermissionService.UpsertPermissionAsync(tree.TreeID, ownerId, 1, operatorUserId);
-            await _auditLogService.WriteAsync("Geno_Trees", tree.TreeID, "CREATE", operatorUserId, new { }, taskId);
+            await _auditLogService.WriteAsync("Geno_Trees", tree.TreeID, "CREATE", operatorUserId, new { }, new
+            {
+                tree.TreeID,
+                tree.TreeName,
+                tree.AncestorName,
+                tree.Region,
+                tree.Description,
+                tree.OwnerID,
+                tree.IsPublic,
+                tree.IsDel
+            }, taskId);
             return tree;
         }
 
@@ -93,7 +103,17 @@ namespace 家谱.Services
             }
 
             await _db.SaveChangesAsync();
-            await _auditLogService.WriteAsync("Geno_Trees", tree.TreeID, "DELETE", operatorUserId, before, taskId);
+            await _auditLogService.WriteAsync("Geno_Trees", tree.TreeID, "DELETE", operatorUserId, before, new
+            {
+                tree.TreeID,
+                tree.TreeName,
+                tree.AncestorName,
+                tree.Region,
+                tree.Description,
+                tree.OwnerID,
+                tree.IsPublic,
+                tree.IsDel
+            }, taskId);
             return true;
         }
 
@@ -150,7 +170,15 @@ namespace 家谱.Services
             oldTree.IsPublic = dto.IsPublic;
 
             await _db.SaveChangesAsync();
-            await _auditLogService.WriteAsync("Geno_Trees", oldTree.TreeID, "UPDATE", operatorUserId, before, taskId);
+            await _auditLogService.WriteAsync("Geno_Trees", oldTree.TreeID, "UPDATE", operatorUserId, before, new
+            {
+                oldTree.TreeID,
+                oldTree.TreeName,
+                oldTree.AncestorName,
+                oldTree.Region,
+                oldTree.Description,
+                oldTree.IsPublic
+            }, taskId);
             return true;
         }
 

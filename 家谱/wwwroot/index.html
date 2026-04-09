@@ -406,8 +406,9 @@
 
         async function loadPublicTrees() {
             try {
-                const list = await requestJson("/api/GenoTree/GetAll");
-                const trees = Array.isArray(list) ? list.filter(item => item.isPublic).slice(0, 5) : [];
+                const result = await requestJson("/api/GenoTree/GetAll");
+                const list = Array.isArray(result.data) ? result.data : [];
+                const trees = list.filter(item => item.isPublic).slice(0, 5);
                 const container = document.getElementById("publicTrees");
 
                 if (!trees.length) {

@@ -1,5 +1,8 @@
 namespace 家谱.Models.DTOs
 {
+    /// <summary>
+    /// 申请或分配树内权限的请求体。
+    /// </summary>
     public class TreePermissionApplyDto
     {
         public Guid TreeId { get; set; }
@@ -11,6 +14,9 @@ namespace 家谱.Models.DTOs
         public Guid? TargetUserId { get; set; }
     }
 
+    /// <summary>
+    /// 树权限展示对象。
+    /// </summary>
     public class TreePermissionDto
     {
         public Guid PermissionId { get; set; }
@@ -32,6 +38,9 @@ namespace 家谱.Models.DTOs
         public bool IsOwner { get; set; }
     }
 
+    /// <summary>
+    /// 当前用户在树上的访问能力。
+    /// </summary>
     public class TreeAccessDto
     {
         public bool IsSuperAdmin { get; set; }
@@ -49,6 +58,9 @@ namespace 家谱.Models.DTOs
         public bool CanManagePermissions { get; set; }
     }
 
+    /// <summary>
+    /// 工作流处理结果。
+    /// </summary>
     public class WorkflowResultDto
     {
         public bool AppliedDirectly { get; set; }

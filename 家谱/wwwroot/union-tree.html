@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>婚姻单元树 - 赵氏家谱平台</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #8b4513;
+            --accent: #a0522d;
+            --gold: #d4af37;
+            --paper: #fdfaf2;
+            --glass: rgba(255, 255, 255, 0.88);
+            --border: rgba(139, 69, 19, 0.14);
+            --ink: #3f352d;
+            --union: #efe6d5;
+            --member-fill: #fffdfa;
+            --female: #f8efe8;
+            --male: #f4efe2;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            padding-top: 80px;
+            font-family: "Noto Serif SC", "KaiTi", serif;
+            background: var(--paper);
+            color: var(--ink);
+        }
+
+        .navbar {
+            position: fixed;
+            inset: 0 0 auto 0;
+            min-height: 80px;
+            padding: 0 5%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--glass);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border);
+            z-index: 1000;
+        }
+
+        .logo {
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: 4px;
+            color: var(--primary);
+            text-decoration: none;
+        }
+
+        .nav {
+            display: flex;
+            gap: 22px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .nav a,
+        .nav button {
+            border: none;
+            background: none;
+            padding: 0;
+            color: #5c5148;
+            text-decoration: none;
+            font: inherit;
+            cursor: pointer;
+        }
+
+        .nav a:hover,
+        .nav button:hover {
+            color: var(--primary);
+        }
+
+        .hero {
+            min-height: 220px;
+            background:
+                linear-gradient(rgba(44, 30, 22, 0.48), rgba(44, 30, 22, 0.42)),
+                url("https://images.unsplash.com/photo-1491833485966-73cfb9ccea53?q=80&w=1800") center/cover;
+            color: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 0 20px;
+        }
+
+        .hero h1 {
+            margin: 0 0 10px;
+            font-size: 38px;
+            letter-spacing: 6px;
+        }
+
+        .hero p {
+            margin: 0;
+            max-width: 860px;
+            line-height: 1.9;
+        }
+
+        .wrap {
+            max-width: 1400px;
+            margin: -36px auto 48px;
+            padding: 0 20px;
+        }
+
+        .panel {
+            background: #fff;
+            border-radius: 4px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.05);
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .title {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+            padding-left: 15px;
+            border-left: 5px solid var(--primary);
+            color: var(--primary);
+            font-size: 22px;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 18px;
+            margin-bottom: 20px;
+        }
+
+        .summary-card {
+            background: #faf7f2;
+            border-left: 3px solid var(--gold);
+            padding: 14px 16px;
+            line-height: 1.7;
+        }
+
+        .summary-card strong {
+            display: block;
+            color: var(--primary);
+            font-size: 28px;
+            margin-bottom: 6px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+
+        .btn,
+        .btn-line {
+            border-radius: 2px;
+            padding: 10px 16px;
+            cursor: pointer;
+            font: inherit;
+        }
+
+        .btn {
+            border: none;
+            background: var(--primary);
+            color: #fff;
+        }
+
+        .btn-line {
+            border: 1px solid var(--primary);
+            background: #fff;
+            color: var(--primary);
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+        }
+
+        .workspace {
+            display: grid;
+            grid-template-columns: 1fr 320px;
+            gap: 20px;
+        }
+
+        .viewport {
+            position: relative;
+            min-height: 780px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background:
+                radial-gradient(circle at top, rgba(212, 175, 55, 0.07), transparent 32%),
+                linear-gradient(180deg, rgba(255,255,255,0.96), rgba(249,245,238,0.96));
+            cursor: grab;
+        }
+
+        .viewport.dragging {
+            cursor: grabbing;
+        }
+
+        .stage {
+            transform-origin: 0 0;
+        }
+
+        .empty {
+            color: #8f8376;
+            text-align: center;
+            padding: 60px 20px;
+        }
+
+        .side-card {
+            background: #faf7f2;
+            border: 1px solid var(--border);
+            padding: 18px;
+            line-height: 1.8;
+        }
+
+        .side-card strong {
+            display: block;
+            color: var(--primary);
+            margin-bottom: 8px;
+        }
+
+        .legend {
+            display: grid;
+            gap: 10px;
+        }
+
+        .legend-item {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            color: #675c54;
+        }
+
+        .legend-chip {
+            width: 18px;
+            height: 18px;
+            border-radius: 4px;
+            border: 1px solid rgba(139, 69, 19, 0.18);
+        }
+
+        .message {
+            min-height: 24px;
+            color: #a94442;
+        }
+
+        svg text {
+            pointer-events: none;
+            user-select: none;
+        }
+
+        .node {
+            cursor: pointer;
+        }
+
+        .node.member rect {
+            fill: var(--member-fill);
+            stroke: rgba(139, 69, 19, 0.2);
+            stroke-width: 1.4;
+        }
+
+        .node.member.male rect {
+            fill: var(--male);
+        }
+
+        .node.member.female rect {
+            fill: var(--female);
+        }
+
+        .node.union rect {
+            fill: var(--union);
+            stroke: rgba(139, 69, 19, 0.26);
+            stroke-width: 1.3;
+        }
+
+        .node.active rect {
+            stroke: var(--gold);
+            stroke-width: 2.4;
+        }
+
+        .edge {
+            stroke-width: 2;
+        }
+
+        .edge.partner {
+            stroke: rgba(125, 88, 53, 0.92);
+        }
+
+        .edge.child {
+            stroke: rgba(162, 116, 67, 0.7);
+        }
+
+        .edge-label {
+            font-size: 10px;
+            fill: #866745;
+        }
+
+        @media (max-width: 1100px) {
+            .workspace {
+                grid-template-columns: 1fr;
+            }
+
+            .summary-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 720px) {
+            body {
+                padding-top: 72px;
+            }
+
+            .navbar {
+                min-height: 72px;
+                padding: 0 16px;
+            }
+
+            .logo {
+                font-size: 22px;
+                letter-spacing: 2px;
+            }
+
+            .hero h1 {
+                font-size: 28px;
+                letter-spacing: 3px;
+            }
+
+            .summary-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .viewport {
+                min-height: 560px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="navbar">
+        <a class="logo" href="index.html">赵氏家谱</a>
+        <nav class="nav">
+            <a id="backLink" href="public.html">返回详情</a>
+            <a id="detailLink" href="public.html">查看树资料</a>
+            <button id="logoutBtn" type="button">退出登录</button>
+        </nav>
+    </header>
+
+    <section class="hero">
+        <div>
+            <h1 id="pageTitle">婚姻单元树</h1>
+            <p id="pageSubtitle">以成员、婚姻单元和子女关系为主线展示整棵家谱树，适合上千上万人规模的分支浏览与关系定位。</p>
+        </div>
+    </section>
+
+    <main class="wrap">
+        <section class="panel">
+            <div class="title">结构概览</div>
+            <div class="summary-grid">
+                <div class="summary-card">
+                    <strong id="memberCount">0</strong>
+                    成员数量
+                </div>
+                <div class="summary-card">
+                    <strong id="unionCount">0</strong>
+                    婚姻单元
+                </div>
+                <div class="summary-card">
+                    <strong id="generationCount">0</strong>
+                    代际层数
+                </div>
+                <div class="summary-card">
+                    <strong id="stageSize">0 x 0</strong>
+                    画布尺寸
+                </div>
+            </div>
+            <div class="controls">
+                <button class="btn" id="fitBtn" type="button">适应画布</button>
+                <button class="btn-line" id="zoomInBtn" type="button">放大</button>
+                <button class="btn-line" id="zoomOutBtn" type="button">缩小</button>
+                <button class="btn-line" id="downloadSvgBtn" type="button">下载 SVG 图</button>
+                <button class="btn-line" id="downloadPngBtn" type="button">下载 PNG 图</button>
+            </div>
+            <div class="message" id="message"></div>
+        </section>
+
+        <section class="workspace">
+            <section class="panel">
+                <div class="title">婚姻单元树图</div>
+                <div class="viewport" id="viewport">
+                    <svg class="stage" id="stage" viewBox="0 0 1200 800" width="1200" height="800" aria-label="婚姻单元树图">
+                        <text class="empty" x="50%" y="50%" text-anchor="middle">正在加载家谱图...</text>
+                    </svg>
+                </div>
+            </section>
+
+            <aside>
+                <div class="side-card" style="margin-bottom: 18px;">
+                    <strong>节点说明</strong>
+                    <div class="legend">
+                        <div class="legend-item">
+                            <span class="legend-chip" style="background:#f4efe2;"></span>
+                            男性成员
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-chip" style="background:#f8efe8;"></span>
+                            女性成员
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-chip" style="background:#efe6d5;"></span>
+                            婚姻单元
+                        </div>
+                    </div>
+                </div>
+
+                <div class="side-card" style="margin-bottom: 18px;">
+                    <strong>使用提示</strong>
+                    <div>1. 鼠标拖拽可平移画布。</div>
+                    <div>2. 滚轮或按钮可缩放。</div>
+                    <div>3. 点击节点可查看详细信息。</div>
+                    <div>4. 适合先整体浏览，再逐个定位分支。</div>
+                </div>
+
+                <div class="side-card">
+                    <strong>当前节点</strong>
+                    <div id="detailContent">点击左侧节点查看详细信息。</div>
+                </div>
+            </aside>
+        </section>
+    </main>
+
+    <script>
+        const token = localStorage.getItem("token");
+        const params = new URLSearchParams(location.search);
+        const treeId = params.get("treeId") || params.get("id");
+        const viewport = document.getElementById("viewport");
+        const stage = document.getElementById("stage");
+        const detailContent = document.getElementById("detailContent");
+
+        const state = {
+            graph: null,
+            scale: 1,
+            offsetX: 0,
+            offsetY: 0,
+            dragging: false,
+            dragStartX: 0,
+            dragStartY: 0,
+            selectedNodeId: ""
+        };
+
+        if (!treeId) {
+            location.href = "public.html";
+        }
+
+        document.getElementById("backLink").href = `tree-detail.html?id=${encodeURIComponent(treeId)}`;
+        document.getElementById("detailLink").href = `tree-detail.html?id=${encodeURIComponent(treeId)}`;
+
+        if (!token) {
+            document.getElementById("logoutBtn").textContent = "返回首页";
+        }
+
+        function authHeaders() {
+            return token ? { Authorization: `Bearer ${token}` } : {};
+        }
+
+        function esc(value) {
+            return String(value ?? "")
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#39;");
+        }
+
+        function setMessage(text) {
+            document.getElementById("message").textContent = text || "";
+        }
+
+        function downloadBlob(blob, fileName) {
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }
+
+        function safeFileName(value) {
+            return String(value || "union-tree").replace(/[\\/:*?"<>|]+/g, "-");
+        }
+
+        async function req(url, options = {}) {
+            const response = await fetch(url, options);
+            const contentType = response.headers.get("content-type") || "";
+            const payload = contentType.includes("application/json") ? await response.json() : await response.text();
+            if (!response.ok) {
+                throw new Error(typeof payload === "string" ? payload : payload?.message || "请求失败");
+            }
+            return payload;
+        }
+
+        function nodeCenter(node) {
+            return {
+                x: node.x + node.width / 2,
+                y: node.y + node.height / 2
+            };
+        }
+
+        function edgePath(fromNode, toNode) {
+            const start = { x: fromNode.x + fromNode.width / 2, y: fromNode.y + fromNode.height };
+            const end = { x: toNode.x + toNode.width / 2, y: toNode.y };
+            const midY = start.y + (end.y - start.y) / 2;
+            return `M ${start.x} ${start.y} L ${start.x} ${midY} L ${end.x} ${midY} L ${end.x} ${end.y}`;
+        }
+
+        function updateTransform() {
+            stage.style.transform = `translate(${state.offsetX}px, ${state.offsetY}px) scale(${state.scale})`;
+        }
+
+        function fitToViewport() {
+            if (!state.graph) {
+                return;
+            }
+
+            const viewportWidth = viewport.clientWidth;
+            const viewportHeight = viewport.clientHeight;
+            const scaleX = viewportWidth / state.graph.width;
+            const scaleY = viewportHeight / state.graph.height;
+            state.scale = Math.max(0.18, Math.min(scaleX, scaleY, 1));
+            state.offsetX = (viewportWidth - state.graph.width * state.scale) / 2;
+            state.offsetY = (viewportHeight - state.graph.height * state.scale) / 2;
+            updateTransform();
+        }
+
+        function zoomBy(factor) {
+            const nextScale = Math.min(2.5, Math.max(0.12, state.scale * factor));
+            const centerX = viewport.clientWidth / 2;
+            const centerY = viewport.clientHeight / 2;
+            state.offsetX = centerX - ((centerX - state.offsetX) * nextScale / state.scale);
+            state.offsetY = centerY - ((centerY - state.offsetY) * nextScale / state.scale);
+            state.scale = nextScale;
+            updateTransform();
+        }
+
+        function renderDetail(node) {
+            if (!node) {
+                detailContent.innerHTML = "点击左侧节点查看详细信息。";
+                return;
+            }
+
+            if (node.kind === "member") {
+                detailContent.innerHTML = `
+                    <div>节点类型：成员</div>
+                    <div>姓名：${esc(node.label)}</div>
+                    <div>说明：${esc(node.subtitle)}</div>
+                    <div>成员 ID：${esc(node.memberId || "")}</div>
+                    <div>代际：第 ${esc(node.generation)} 代</div>
+                `;
+                return;
+            }
+
+            detailContent.innerHTML = `
+                <div>节点类型：婚姻单元</div>
+                <div>婚姻类型：${esc(node.label)}</div>
+                <div>说明：${esc(node.subtitle)}</div>
+                <div>单元 ID：${esc(node.unionId || "")}</div>
+                <div>所在层级：第 ${esc(node.generation)} 代之间</div>
+            `;
+        }
+
+        function renderGraph(graph) {
+            state.graph = graph;
+            document.getElementById("pageTitle").textContent = `${graph.treeName} · 婚姻单元树`;
+            document.getElementById("pageSubtitle").textContent = "以成员、婚姻单元和子女关系组成图结构，适合家谱树的整支脉络浏览、分房定位和婚姻关系展示。";
+            document.getElementById("memberCount").textContent = String(graph.memberCount || 0);
+            document.getElementById("unionCount").textContent = String(graph.unionCount || 0);
+            document.getElementById("generationCount").textContent = String(graph.generationCount || 0);
+            document.getElementById("stageSize").textContent = `${Math.round(graph.width)} x ${Math.round(graph.height)}`;
+
+            stage.setAttribute("viewBox", `0 0 ${graph.width} ${graph.height}`);
+            stage.setAttribute("width", graph.width);
+            stage.setAttribute("height", graph.height);
+
+            const nodesById = new Map(graph.nodes.map(node => [node.id, node]));
+
+            const edgesMarkup = graph.edges.map(edge => {
+                const fromNode = nodesById.get(edge.fromId);
+                const toNode = nodesById.get(edge.toId);
+                if (!fromNode || !toNode) {
+                    return "";
+                }
+
+                const labelMarkup = edge.label
+                    ? `<text class="edge-label" x="${(nodeCenter(fromNode).x + nodeCenter(toNode).x) / 2}" y="${(nodeCenter(fromNode).y + nodeCenter(toNode).y) / 2 - 6}" text-anchor="middle">${esc(edge.label)}</text>`
+                    : "";
+
+                return `
+                    <g>
+                        <path class="edge ${esc(edge.kind)}" d="${edgePath(fromNode, toNode)}" fill="none"></path>
+                        ${labelMarkup}
+                    </g>
+                `;
+            }).join("");
+
+            const nodesMarkup = graph.nodes.map(node => {
+                const classes = [
+                    "node",
+                    node.kind,
+                    node.kind === "member" && node.subtitle.includes("男") ? "male" : "",
+                    node.kind === "member" && node.subtitle.includes("女") ? "female" : "",
+                    state.selectedNodeId === node.id ? "active" : ""
+                ].filter(Boolean).join(" ");
+
+                const labelX = node.x + node.width / 2;
+                const titleY = node.y + (node.kind === "union" ? 12 : 24);
+                const subY = node.y + (node.kind === "union" ? 24 : 45);
+
+                return `
+                    <g class="${classes}" data-id="${esc(node.id)}">
+                        <rect x="${node.x}" y="${node.y}" rx="${node.kind === "union" ? 10 : 12}" ry="${node.kind === "union" ? 10 : 12}" width="${node.width}" height="${node.height}"></rect>
+                        <text x="${labelX}" y="${titleY}" text-anchor="middle" font-size="${node.kind === "union" ? 11 : 15}" font-weight="700" fill="#6c4e32">${esc(node.label)}</text>
+                        <text x="${labelX}" y="${subY}" text-anchor="middle" font-size="${node.kind === "union" ? 9 : 11}" fill="#8d7662">${esc(node.subtitle)}</text>
+                    </g>
+                `;
+            }).join("");
+
+            stage.innerHTML = `${edgesMarkup}${nodesMarkup}`;
+
+            stage.querySelectorAll(".node").forEach(element => {
+                element.addEventListener("click", event => {
+                    event.stopPropagation();
+                    state.selectedNodeId = element.getAttribute("data-id") || "";
+                    renderDetail(nodesById.get(state.selectedNodeId));
+                    renderGraph(state.graph);
+                });
+            });
+
+            fitToViewport();
+        }
+
+        function buildSvgMarkup() {
+            if (!state.graph) {
+                throw new Error("当前还没有可下载的图数据");
+            }
+
+            return `<?xml version="1.0" encoding="UTF-8"?>\n${stage.outerHTML}`;
+        }
+
+        function downloadSvg() {
+            try {
+                const blob = new Blob([buildSvgMarkup()], { type: "image/svg+xml;charset=utf-8" });
+                downloadBlob(blob, `${safeFileName(state.graph?.treeName)}-union-tree.svg`);
+            } catch (error) {
+                setMessage(error.message);
+            }
+        }
+
+        async function downloadPng() {
+            try {
+                const markup = buildSvgMarkup();
+                const blob = new Blob([markup], { type: "image/svg+xml;charset=utf-8" });
+                const url = URL.createObjectURL(blob);
+                const image = new Image();
+                image.decoding = "async";
+
+                await new Promise((resolve, reject) => {
+                    image.onload = resolve;
+                    image.onerror = () => reject(new Error("婚姻图转换 PNG 失败"));
+                    image.src = url;
+                });
+
+                const canvas = document.createElement("canvas");
+                canvas.width = Math.ceil(state.graph.width);
+                canvas.height = Math.ceil(state.graph.height);
+                const context = canvas.getContext("2d");
+                context.fillStyle = "#fdfaf2";
+                context.fillRect(0, 0, canvas.width, canvas.height);
+                context.drawImage(image, 0, 0);
+
+                const pngBlob = await new Promise(resolve => canvas.toBlob(resolve, "image/png"));
+                URL.revokeObjectURL(url);
+                if (!pngBlob) {
+                    throw new Error("PNG 导出失败");
+                }
+
+                downloadBlob(pngBlob, `${safeFileName(state.graph?.treeName)}-union-tree.png`);
+            } catch (error) {
+                setMessage(error.message);
+            }
+        }
+
+        async function loadGraph() {
+            setMessage("正在读取婚姻单元树数据...");
+            const result = await req(`/api/Union/graph/${treeId}`, { headers: authHeaders() });
+            renderGraph(result.data || {});
+            setMessage("");
+        }
+
+        viewport.addEventListener("mousedown", event => {
+            state.dragging = true;
+            state.dragStartX = event.clientX - state.offsetX;
+            state.dragStartY = event.clientY - state.offsetY;
+            viewport.classList.add("dragging");
+        });
+
+        window.addEventListener("mousemove", event => {
+            if (!state.dragging) {
+                return;
+            }
+
+            state.offsetX = event.clientX - state.dragStartX;
+            state.offsetY = event.clientY - state.dragStartY;
+            updateTransform();
+        });
+
+        window.addEventListener("mouseup", () => {
+            state.dragging = false;
+            viewport.classList.remove("dragging");
+        });
+
+        viewport.addEventListener("wheel", event => {
+            event.preventDefault();
+            zoomBy(event.deltaY < 0 ? 1.12 : 0.9);
+        }, { passive: false });
+
+        stage.addEventListener("click", event => {
+            if (event.target === stage) {
+                state.selectedNodeId = "";
+                renderDetail(null);
+                renderGraph(state.graph);
+            }
+        });
+
+        document.getElementById("fitBtn").addEventListener("click", fitToViewport);
+        document.getElementById("zoomInBtn").addEventListener("click", () => zoomBy(1.16));
+        document.getElementById("zoomOutBtn").addEventListener("click", () => zoomBy(0.86));
+        document.getElementById("downloadSvgBtn").addEventListener("click", downloadSvg);
+        document.getElementById("downloadPngBtn").addEventListener("click", downloadPng);
+        document.getElementById("logoutBtn").addEventListener("click", () => {
+            localStorage.removeItem("token");
+            location.href = "index.html";
+        });
+
+        window.addEventListener("resize", () => {
+            if (state.graph) {
+                fitToViewport();
+            }
+        });
+
+        loadGraph().catch(error => {
+            setMessage(error.message);
+            stage.innerHTML = "";
+            detailContent.innerHTML = "加载失败，请稍后重试。";
+        });
+    </script>
+</body>
+</html>

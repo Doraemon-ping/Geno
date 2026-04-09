@@ -263,5 +263,16 @@
                 return Ok(ApiResponse.OK());
             throw new Exception(result.message);
         }
+
+        /// <summary>
+        /// 搜索系统用户。
+        /// </summary>
+        [Authorize]
+        [HttpGet("search-users")]
+        public async Task<IActionResult> SearchUsers([FromQuery] string? keyword, [FromQuery] int take = 10)
+        {
+            var users = await _authService.SearchUsersAsync(keyword, take);
+            return Ok(ApiResponse.OK(users));
+        }
     }
 }

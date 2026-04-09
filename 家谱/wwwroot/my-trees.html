@@ -527,9 +527,10 @@
 
         async function loadTrees() {
             try {
-                trees = await requestJson("/api/GenoTree/my-trees", {
+                const result = await requestJson("/api/GenoTree/my-trees", {
                     headers: { Authorization: `Bearer ${token}` }
                 });
+                trees = Array.isArray(result.data) ? result.data : [];
                 renderTrees();
             } catch (error) {
                 document.getElementById("treeGrid").innerHTML = `<div class="empty">${error.message}</div>`;

@@ -39,8 +39,8 @@ namespace 家谱.Controllers
         public async Task<ActionResult> ProcessTask([FromBody] TaskProcessDto dto)
         {
             var userId = GetCurrentUserId();
-            await _reviewService.ApproveAsync(dto.TaskId, userId, dto.Notes, dto.Action);
-            return Ok(ApiResponse.OK());
+            var result = await _reviewService.ProcessAsync(dto, userId);
+            return Ok(ApiResponse.OK(result));
         }
 
         private Guid GetCurrentUserId()
