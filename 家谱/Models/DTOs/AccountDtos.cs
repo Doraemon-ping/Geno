@@ -77,6 +77,11 @@
     public class UserDto
     {
         /// <summary>
+        /// Gets or sets the UserId
+        /// </summary>
+        public Guid UserId { get; set; }
+
+        /// <summary>
         /// Gets or sets the Username
         /// </summary>
         public string Username { get; set; } = string.Empty;

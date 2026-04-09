@@ -1,77 +1,168 @@
-﻿namespace 家谱.Services.Common
-{
-    using Microsoft.EntityFrameworkCore;
-    using System.Text.Json;
-    using 家谱.DB;
-    using 家谱.Models.DTOs.Common;
-    using 家谱.Models.Entities;
-    using 家谱.Models.Enums;
+using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
+using 家谱.Common;
+using 家谱.DB;
+using 家谱.Models.DTOs;
+using 家谱.Models.DTOs.Common;
+using 家谱.Models.Entities;
+using 家谱.Models.Enums;
 
+namespace 家谱.Services.Common
+{
     public interface IHandleTasks
     {
-        Task HandleApplyAdminAsync(ReviewTask task, int Action);
+        Task HandleApplyAdminAsync(ReviewTask task, Guid reviewerId);
+
+        Task HandleTreeApplyRoleAsync(ReviewTask task, Guid reviewerId);
+
+        Task HandleTreeCreateAsync(ReviewTask task, Guid reviewerId);
+
+        Task HandleTreeUpdateAsync(ReviewTask task, Guid reviewerId);
+
+        Task HandleTreeDeleteAsync(ReviewTask task, Guid reviewerId);
+
+        Task HandlePoemCreateAsync(ReviewTask task, Guid reviewerId);
+
+        Task HandlePoemUpdateAsync(ReviewTask task, Guid reviewerId);
+
+        Task HandlePoemDeleteAsync(ReviewTask task, Guid reviewerId);
     }
 
-
-    /// <summary>
-    /// Defines the <see cref="HandleTasks" />
-    /// 处理各种审核任务的具体逻辑实现类，提供给 ReviewService 内部调用
-    /// </summary>
     public class HandleTasks : IHandleTasks
     {
         private readonly GenealogyDbContext _db;
+        private readonly IGenoTreeService _treeService;
+        private readonly IGenoPoemService _poemService;
+        private readonly ITreePermissionService _treePermissionService;
+        private readonly IAuditLogService _auditLogService;
 
-        public HandleTasks(GenealogyDbContext db)
+        public HandleTasks(
+            GenealogyDbContext db,
+            IGenoTreeService treeService,
+            IGenoPoemService poemService,
+            ITreePermissionService treePermissionService,
+            IAuditLogService auditLogService)
         {
             _db = db;
+            _treeService = treeService;
+            _poemService = poemService;
+            _treePermissionService = treePermissionService;
+            _auditLogService = auditLogService;
         }
 
-        /// 处理管理员权限申请
-        /// <summary>
-        /// The HandleApplyAdminAsync
-        /// </summary>
-        /// <param name="task">The task<see cref="ReviewTask"/></param>
-        /// <param name="Action">The Action<see cref="int"/></param>
-        /// <returns>The <see cref="Task"/></returns>
-        public async Task HandleApplyAdminAsync(ReviewTask task, int Action)
+        public async Task HandleApplyAdminAsync(ReviewTask task, Guid reviewerId)
         {
-            // 1. 解析 ChangeData 负载
-            var payload = JsonSerializer.Deserialize<RoleApplyPayload>(task.ChangeData, new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true
-            });
-
-            if (payload == null) throw new Exception("无效的权限申请数据");
-
-            // 2. 检查权限表中是否已存在该用户的记录
-            // 3. 根据 Action（同意/拒绝）执行不同的逻辑
-            //Task.TargetID 是须要修改权限的用户 ID，可能非本人提交
-            var user = await _db.Users
-                .FirstOrDefaultAsync(r => r.UserID == task.TargetID);
-
-            string targetRoleName = ((RoleType)payload.NewRole).ToString();
-
-            if (user == null)
-            {
-                throw new Exception("用户不存在");
-            }
+            var payload = JsonSerializer.Deserialize<RoleApplyPayload>(task.ChangeData, JsonDefaults.Options)
+                ?? throw new Exception("无效的权限申请数据");
+            var user = await _db.Users.FirstOrDefaultAsync(r => r.UserID == task.TargetID)
+                ?? throw new Exception("用户不存在");
 
             if (user.RoleType == payload.NewRole)
             {
-                throw new Exception($"用户已是{targetRoleName}，无需重复申请");
+                throw new Exception($"用户已是{ReviewActions.GetRoleDisplayName(payload.NewRole)}，无需重复申请");
             }
 
-            if (Action == 1)//同意
+            var before = new
             {
-                user.RoleType = payload.NewRole;
+                user.UserID,
+                user.Username,
+                user.RoleType,
+                user.Email,
+                user.Phone
+            };
+
+            user.RoleType = payload.NewRole;
+            user.UpdatedAt = DateTime.UtcNow;
+            await _db.SaveChangesAsync();
+            await _auditLogService.WriteAsync("Sys_Users", user.UserID, "UPDATE", reviewerId, before, task.TaskID);
+        }
+
+        public async Task HandleTreeApplyRoleAsync(ReviewTask task, Guid reviewerId)
+        {
+            var payload = JsonSerializer.Deserialize<TreePermissionApplyDto>(task.ChangeData, JsonDefaults.Options)
+                ?? throw new Exception("无效的树权限申请数据");
+
+            var targetUserId = task.TargetID ?? payload.TargetUserId ?? throw new Exception("缺少目标用户");
+            var permission = await _treePermissionService.UpsertPermissionAsync(payload.TreeId, targetUserId, payload.NewRole, reviewerId);
+
+            task.TreeID = payload.TreeId;
+            task.TargetID = targetUserId;
+
+            await _auditLogService.WriteAsync("Geno_Tree_Permissions", permission.PermissionID, "UPDATE", reviewerId, new
+            {
+                TreeID = payload.TreeId,
+                UserID = targetUserId,
+                OldRole = (byte?)null
+            }, task.TaskID);
+        }
+
+        public async Task HandleTreeCreateAsync(ReviewTask task, Guid reviewerId)
+        {
+            var payload = JsonSerializer.Deserialize<GenoTreeDtos>(task.ChangeData, JsonDefaults.Options)
+                ?? throw new Exception("无效的家谱树数据");
+
+            var tree = await _treeService.CreateAsync(payload, task.SubmitterID, reviewerId, task.TaskID);
+            task.TreeID = tree.TreeID;
+            task.TargetID = tree.TreeID;
+        }
+
+        public async Task HandleTreeUpdateAsync(ReviewTask task, Guid reviewerId)
+        {
+            var payload = JsonSerializer.Deserialize<GenoTreeDtos>(task.ChangeData, JsonDefaults.Options)
+                ?? throw new Exception("无效的家谱树更新数据");
+
+            if (task.TargetID == null)
+            {
+                throw new Exception("缺少目标树");
             }
-            else if (Action == 2)//拒绝
+
+            var success = await _treeService.UpdateAsync(payload, task.TargetID.Value, reviewerId, task.TaskID);
+            if (!success)
             {
-                // 不修改用户角色，仅记录审核结果
+                throw new Exception("家谱树不存在");
             }
-            else
+        }
+
+        public async Task HandleTreeDeleteAsync(ReviewTask task, Guid reviewerId)
+        {
+            var treeId = task.TargetID ?? task.TreeID ?? throw new Exception("缺少目标树");
+            var success = await _treeService.DeleteAsync(treeId, reviewerId, task.TaskID);
+            if (!success)
             {
-                throw new Exception("无效的操作类型");
+                throw new Exception("家谱树不存在");
+            }
+        }
+
+        public async Task HandlePoemCreateAsync(ReviewTask task, Guid reviewerId)
+        {
+            var payload = JsonSerializer.Deserialize<PoemDto>(task.ChangeData, JsonDefaults.Options)
+                ?? throw new Exception("无效的字辈数据");
+
+            var poem = await _poemService.CreateAsync(payload, reviewerId, task.TaskID);
+            task.TreeID = payload.TreeId;
+            task.TargetID = poem.PoemID;
+        }
+
+        public async Task HandlePoemUpdateAsync(ReviewTask task, Guid reviewerId)
+        {
+            var payload = JsonSerializer.Deserialize<PoemDto>(task.ChangeData, JsonDefaults.Options)
+                ?? throw new Exception("无效的字辈更新数据");
+            var poemId = task.TargetID ?? throw new Exception("缺少目标字辈");
+
+            var success = await _poemService.UpdateAsync(payload, poemId, reviewerId, task.TaskID);
+            if (!success)
+            {
+                throw new Exception("字辈不存在");
+            }
+        }
+
+        public async Task HandlePoemDeleteAsync(ReviewTask task, Guid reviewerId)
+        {
+            var poemId = task.TargetID ?? throw new Exception("缺少目标字辈");
+            var success = await _poemService.DeleteAsync(poemId, reviewerId, task.TaskID);
+            if (!success)
+            {
+                throw new Exception("字辈不存在");
             }
         }
     }

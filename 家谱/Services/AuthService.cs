@@ -290,10 +290,12 @@
                 .Where(u => u.UserID == userId && u.UserStatus == 1)
                 .Select(u => new UserDto
                 {
+                    UserId = u.UserID,
                     Username = u.Username,
                     Email = u.Email,
                     Phone = u.Phone,
                     RoleType = u.RoleType,
+                    CreatedAt = u.CreatedAt
                 })
                 .FirstOrDefaultAsync();
 
@@ -311,36 +313,39 @@
         public async Task<(bool, string)> UpdateUserProfileAsync(Guid userId, UpdateProfileDto dto)
         {
             var user = await _context.Users.FindAsync(userId);
+            if (user == null)
+                return (false, "请先注册");
             if (user.UserStatus == 0)
                 return (false, "账号已被禁用！");
 
-            if (user == null) return (false,
-            "请先注册");
-
-            if (user.Username == dto.Username)
+            if (!string.IsNullOrWhiteSpace(dto.Username) &&
+                await _context.Users.AnyAsync(u => u.UserID != userId && u.UserStatus == 1 && u.Username == dto.Username))
             {
-                return (false,
-                "用户名已注册");
+                return (false, "用户名已被占用");
             }
 
-            if (user.Email == dto.Email)
+            if (!string.IsNullOrWhiteSpace(dto.Email) &&
+                await _context.Users.AnyAsync(u => u.UserID != userId && u.UserStatus == 1 && u.Email == dto.Email))
             {
-                return (false,
-                "该邮箱已被注册");
+                return (false, "该邮箱已被注册");
             }
 
-            if (user.Phone == dto.Phone)
+            if (!string.IsNullOrWhiteSpace(dto.Phone) &&
+                await _context.Users.AnyAsync(u => u.UserID != userId && u.UserStatus == 1 && u.Phone == dto.Phone))
             {
-                return (false,
-                "该手机号已被注册");
+                return (false, "该手机号已被注册");
             }
             // 仅更新传了值的字段
             if (!string.IsNullOrEmpty(dto.Username)) user.Username = dto.Username;
             if (!string.IsNullOrEmpty(dto.Phone)) user.Phone = dto.Phone;
             if (!string.IsNullOrEmpty(dto.Email)) user.Email = dto.Email;
+            user.UpdatedAt = DateTime.UtcNow;
 
-            return (await _context.SaveChangesAsync() > 0,
-            "修改成功");
+            var changed = _context.Entry(user).Properties.Any(p => p.IsModified);
+            if (!changed)
+                return (false, "未检测到资料变更");
+
+            return (await _context.SaveChangesAsync() > 0, "修改成功");
         }
 
         // 4. 发送重置密码验证码

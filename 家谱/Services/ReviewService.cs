@@ -1,109 +1,70 @@
-﻿namespace 家谱.Services
-{
-    using Microsoft.EntityFrameworkCore;
-    using System;
-    using System.Threading.Tasks;
-    using 家谱.DB;
-    using 家谱.Models.DTOs;
-    using 家谱.Models.Entities;
-    using 家谱.Models.Enums;
-    using 家谱.Services.Common;
+using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
+using 家谱.Common;
+using 家谱.DB;
+using 家谱.Models.DTOs;
+using 家谱.Models.Entities;
+using 家谱.Models.Enums;
+using 家谱.Services.Common;
 
-    /// <summary>
-    /// Defines the <see cref="IReviewService" />
-    /// </summary>
+namespace 家谱.Services
+{
     public interface IReviewService
     {
-        /// <summary>
-        /// The SubmitAsync 统一提交入口：支持所有业务申请
-        /// </summary>
-        /// <param name="dto">The dto<see cref="SubmitReviewRequest"/></param>
-        /// <param name="submitterId">The submitterId<see cref="Guid"/></param>
-        /// <returns>The <see cref="Task{Guid}"/></returns>
         Task<Guid> SubmitAsync(SubmitReviewRequest dto, Guid submitterId);
 
-        /// <summary>
-        /// The ApproveAsync 统一审批出口：通过 ActionCode 路由到具体的内部处理方法
-        /// </summary>
-        /// <param name="taskId">The taskId<see cref="Guid"/></param>
-        /// <param name="reviewerId">The reviewerId<see cref="Guid"/></param>
-        /// <param name="notes">The notes<see cref="string"/></param>
-        /// <param name="action">The action<see cref="int"/></param>
-        /// <returns>The <see cref="Task"/></returns>
         Task ApproveAsync(Guid taskId, Guid reviewerId, string notes, int action);
 
-
-        /// <summary>
-        /// The GetTaskList 获取用户提交或审核的任务列表，方便前端展示
-        /// </summary>
-        /// <param name="userId">The userId<see cref="Guid"/></param>
-        /// <returns>The <see cref="Task{List{SubmitReviewRequest}}"/></returns>
         Task<List<TaskDtos>> GetTaskList(Guid userId);
 
-        /// <summary>
-        /// The GetAll 获取所有待审核的任务列表，供管理员审核使用
-        /// </summary>
-        /// <param name="userId">The userId<see cref="Guid"/></param>
-        /// <returns>The <see cref="Task{List{TaskDtos}}"/></returns>
         Task<List<TaskDtos>> GetAll(Guid userId);
     }
 
-    /// <summary>
-    /// Defines the <see cref="ReviewService" />
-    /// </summary>
     public class ReviewService : IReviewService
     {
-        /// <summary>
-        /// Defines the _db
-        /// </summary>
         private readonly GenealogyDbContext _db;
-
-        /// <summary>
-        /// Defines the _handler
-        /// </summary>
         private readonly IHandleTasks _handler;
+        private readonly ITreePermissionService _treePermissionService;
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="ReviewService"/> class.
-        /// </summary>
-        /// <param name="db">The db<see cref="GenealogyDbContext"/></param>
-        /// <param name="logger">The logger<see cref="ILogger{ReviewService}"/></param>
-        /// <param name="handleTasks">The handleTasks<see cref="IHandleTasks"/></param>
-        public ReviewService(GenealogyDbContext db, ILogger<ReviewService> logger, IHandleTasks handleTasks)
+        public ReviewService(GenealogyDbContext db, IHandleTasks handleTasks, ITreePermissionService treePermissionService)
         {
             _db = db;
             _handler = handleTasks;
+            _treePermissionService = treePermissionService;
         }
 
-        /// <summary>
-        /// 1. 统一提交入口：支持所有业务申请
-        /// </summary>
-        /// <param name="dto">The dto<see cref="SubmitReviewRequest"/></param>
-        /// <param name="submitterId">The submitterId<see cref="Guid"/></param>
-        /// <returns>The <see cref="Task{Guid}"/></returns>
         public async Task<Guid> SubmitAsync(SubmitReviewRequest dto, Guid submitterId)
         {
-
-            var t = await _db.ReviewTasks.FirstOrDefaultAsync(t =>
+            IQueryable<ReviewTask> duplicateQuery = _db.ReviewTasks.Where(t =>
                 t.SubmitterID == submitterId &&
-                t.TargetID == dto.TargetId &&
                 t.ActionCode == dto.ActionCode &&
-                t.Status == 0);
+                t.Status == (byte)ReviewStatus.Pending);
 
-            if (t != null)
+            if (dto.TargetId.HasValue)
             {
-                throw new Exception("您已提交过相同的申请，请等待审核结果");
+                duplicateQuery = duplicateQuery.Where(t => t.TargetID == dto.TargetId);
+            }
+
+            if (dto.TreeId.HasValue)
+            {
+                duplicateQuery = duplicateQuery.Where(t => t.TreeID == dto.TreeId);
+            }
+
+            if (!dto.ForceCreateTask && await duplicateQuery.AnyAsync())
+            {
+                throw new Exception("您已提交过同类待审核申请，请等待审核结果");
             }
 
             var task = new ReviewTask
             {
                 TreeID = dto.TreeId,
-                SubmitterID = submitterId,// 从参数传入，确保安全,保证提交人与 Token 中一致，防止冒用他人 ID 提交
-                ActionCode = dto.ActionCode, // 如 "Member.Update", "Tree.ApplyRole"
+                SubmitterID = submitterId,
+                ActionCode = dto.ActionCode,
                 TargetID = dto.TargetId,
-                ChangeData = dto.ChangeData, // 直接存储 JSON 字符串
+                ChangeData = dto.ChangeData,
                 ApplyReason = dto.Reason,
-                Status = 0 // Pending
+                Status = (byte)ReviewStatus.Pending,
+                CreatedAt = DateTime.UtcNow
             };
 
             _db.ReviewTasks.Add(task);
@@ -111,110 +72,334 @@
             return task.TaskID;
         }
 
-        /// <summary>
-        /// 2. 统一审批出口：通过 ActionCode 路由到具体的内部处理方法
-        /// </summary>
-        /// <param name="taskId">The taskId<see cref="Guid"/></param>
-        /// <param name="reviewerId">The reviewerId<see cref="Guid"/></param>
-        /// <param name="notes">The notes<see cref="string"/></param>
-        /// <param name="action">The action<see cref="int"/></param>
-        /// <returns>The <see cref="Task"/></returns>
         public async Task ApproveAsync(Guid taskId, Guid reviewerId, string notes, int action)
         {
             var task = await _db.ReviewTasks.FirstOrDefaultAsync(t => t.TaskID == taskId);
-            if (task == null || task.Status != 0) throw new Exception("任务不存在或已处理");
+            if (task == null || task.Status != (byte)ReviewStatus.Pending)
+            {
+                throw new Exception("任务不存在或已处理");
+            }
+
+            if (!await _treePermissionService.CanReviewTaskAsync(task, reviewerId))
+            {
+                throw new Exception("无权限处理该审核任务");
+            }
+
+            if (action != 1 && action != 2)
+            {
+                throw new Exception("无效的审核动作");
+            }
 
             using var transaction = await _db.Database.BeginTransactionAsync();
             try
             {
-                // 路由：根据 ActionCode 分发逻辑
-                switch (task.ActionCode)
+                if (action == 1)
                 {
-                    case ReviewActions.ApplyAdmin:
-                        await _handler.HandleApplyAdminAsync(task, action);
-                        break;
+                    switch (task.ActionCode)
+                    {
+                        case ReviewActions.ApplyAdmin:
+                            await _handler.HandleApplyAdminAsync(task, reviewerId);
+                            break;
+                        case ReviewActions.TreeApplyRole:
+                            await _handler.HandleTreeApplyRoleAsync(task, reviewerId);
+                            break;
+                        case ReviewActions.TreeCreate:
+                            await _handler.HandleTreeCreateAsync(task, reviewerId);
+                            break;
+                        case ReviewActions.TreeUpdate:
+                            await _handler.HandleTreeUpdateAsync(task, reviewerId);
+                            break;
+                        case ReviewActions.TreeDelete:
+                            await _handler.HandleTreeDeleteAsync(task, reviewerId);
+                            break;
+                        case ReviewActions.PoemCreate:
+                            await _handler.HandlePoemCreateAsync(task, reviewerId);
+                            break;
+                        case ReviewActions.PoemUpdate:
+                            await _handler.HandlePoemUpdateAsync(task, reviewerId);
+                            break;
+                        case ReviewActions.PoemDelete:
+                            await _handler.HandlePoemDeleteAsync(task, reviewerId);
+                            break;
+                        default:
+                            throw new Exception($"未定义的业务操作: {task.ActionCode}");
+                    }
 
-                    default:
-                        throw new Exception($"未定义的业务操作: {task.ActionCode}");
+                    task.Status = (byte)ReviewStatus.Approved;
+                }
+                else
+                {
+                    task.Status = (byte)ReviewStatus.Rejected;
                 }
 
-                // 更新任务状态
-                task.Status = 1; // Approved
                 task.ReviewerID = reviewerId;
-                task.ReviewNotes = notes;
-                task.ProcessedAt = DateTime.Now;
+                task.ReviewNotes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+                task.ProcessedAt = DateTime.UtcNow;
 
                 await _db.SaveChangesAsync();
                 await transaction.CommitAsync();
             }
-            catch (Exception ex)
+            catch
             {
                 await transaction.RollbackAsync();
                 throw;
             }
         }
 
-        /// <summary>
-        /// The GetTaskList 获取用户提交或审核的任务列表，方便前端展示
-        /// </summary>
-        /// <param name="userId">The userId<see cref="Guid"/></param>
-        /// <returns>The <see cref="Task{List{SubmitReviewRequest}}"/></returns>
-        public Task<List<TaskDtos>> GetTaskList(Guid userId)
+        public async Task<List<TaskDtos>> GetTaskList(Guid userId)
         {
-            var user = _db.Users.FirstOrDefaultAsync(u => u.UserID == userId && u.UserStatus == 1);
-            if (user == null)
+            var userExists = await _db.Users.AnyAsync(u => u.UserID == userId && u.UserStatus == 1);
+            if (!userExists)
+            {
                 throw new Exception("用户不存在");
+            }
 
-            var tasks = _db.ReviewTasks
-                 .Where(t => t.SubmitterID == userId || t.ReviewerID == userId)
-                 .Select(t => new TaskDtos
-                 {
-                     TaskId = t.TaskID,
-                     SubmitterName = t.Submitter.Username,
-                     ActionName = t.ActionCode, // 可以通过映射关系获取更友好的名称
-                     ChangeData = t.ChangeData, // 前端根据 ActionCode 解析显示
-                     Reason = t.ApplyReason,
-                     Status = t.Status == 0 ? "待审核" : (t.Status == 1 ? "审核通过" : "审核驳回"),
-                     ReviewName = t.Reviewer.Username == null ? "待分配" : t.Reviewer.Username,
-                     ReviewNotes = t.ReviewNotes ?? "无",
-                     CreateTime = t.CreatedAt.ToString("yyyy-MM-dd HH:mm"),
-                     ProcessTime = t.ProcessedAt != null ? t.ProcessedAt.Value.ToString("yyyy-MM-dd HH:mm") : "待处理"
-                 })
-                 .ToList();
-            return Task.FromResult(tasks);
+            var tasks = await _db.ReviewTasks
+                .AsNoTracking()
+                .Where(t => t.SubmitterID == userId || t.ReviewerID == userId)
+                .OrderByDescending(t => t.CreatedAt)
+                .ToListAsync();
+
+            var result = new List<TaskDtos>(tasks.Count);
+            foreach (var task in tasks)
+            {
+                result.Add(await MapTaskDtoAsync(task, userId));
+            }
+
+            return result;
         }
 
-        /// <summary>
-        /// The GetAll 获取所有待审核的任务列表，供管理员审核使用
-        /// </summary>
-        /// <param name="userId">The userId<see cref="Guid"/></param>
-        /// <returns>The <see cref="Task{List{TaskDtos}}"/></returns>
         public async Task<List<TaskDtos>> GetAll(Guid userId)
         {
-            var user = await _db.Users.FirstOrDefaultAsync(u => u.UserID == userId && u.UserStatus == 1);
+            var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.UserID == userId && u.UserStatus == 1);
             if (user == null)
+            {
                 throw new Exception("用户不存在");
-            if (user.RoleType != 0)
-                throw new Exception("无权限访问");
+            }
 
-            var tasks = _db.ReviewTasks
-                 .Where(t => t.Status == 0)
-                 .Select(t => new TaskDtos
-                 {
-                     TaskId = t.TaskID,
-                     SubmitterName = t.Submitter.Username,
-                     ActionName = t.ActionCode, // 可以通过映射关系获取更友好的名称
-                     ChangeData = t.ChangeData, // 前端根据 ActionCode 解析显示
-                     Reason = t.ApplyReason,
-                     Status = t.Status == 0 ? "待审核" : (t.Status == 1 ? "审核通过" : "审核驳回"),
-                     ReviewName = t.Reviewer.Username == null ? "待分配" : t.Reviewer.Username,
-                     ReviewNotes = t.ReviewNotes ?? "无",
-                     CreateTime = t.CreatedAt.ToString("yyyy-MM-dd HH:mm"),
-                     ProcessTime = t.ProcessedAt != null ? t.ProcessedAt.Value.ToString("yyyy-MM-dd HH:mm") : "待处理"
-                 })
-                 .ToList();
-            return tasks;
+            var tasks = await _db.ReviewTasks
+                .AsNoTracking()
+                .Where(t => t.Status == (byte)ReviewStatus.Pending)
+                .OrderByDescending(t => t.CreatedAt)
+                .ToListAsync();
+
+            var result = new List<TaskDtos>();
+            foreach (var task in tasks)
+            {
+                if (!await _treePermissionService.CanReviewTaskAsync(task, userId))
+                {
+                    continue;
+                }
+
+                result.Add(await MapTaskDtoAsync(task, userId, true));
+            }
+
+            return result;
         }
-    }
 
+        private async Task<TaskDtos> MapTaskDtoAsync(ReviewTask task, Guid currentUserId, bool? canProcessOverride = null)
+        {
+            var changeData = DeserializeJson(task.ChangeData);
+            var submitter = await BuildUserSummaryAsync(task.SubmitterID);
+            var reviewer = task.ReviewerID.HasValue ? await BuildUserSummaryAsync(task.ReviewerID.Value) : null;
+            var treeSummary = task.TreeID.HasValue ? await BuildTreeSummaryAsync(task.TreeID.Value) : BuildTreeSummaryFromPayload(task.ActionCode, changeData);
+            var targetSummary = await BuildTargetSummaryAsync(task, changeData);
+
+            var canProcess = canProcessOverride ?? await _treePermissionService.CanReviewTaskAsync(task, currentUserId);
+
+            return new TaskDtos
+            {
+                ActionCode = task.ActionCode,
+                TaskId = task.TaskID,
+                SubmitterName = ReadStringProperty(submitter, "username", "未知"),
+                SubmitterId = task.SubmitterID,
+                Submitter = submitter,
+                ActionName = ReviewActions.GetDisplayName(task.ActionCode),
+                ChangeData = changeData ?? new { },
+                TreeId = task.TreeID,
+                TreeSummary = treeSummary,
+                TargetId = task.TargetID,
+                TargetType = GetTargetType(task.ActionCode),
+                TargetSummary = targetSummary,
+                Reason = task.ApplyReason,
+                Status = task.Status switch
+                {
+                    (byte)ReviewStatus.Pending => "待审核",
+                    (byte)ReviewStatus.Approved => "审核通过",
+                    (byte)ReviewStatus.Rejected => "审核驳回",
+                    _ => "已撤回"
+                },
+                ReviewName = ReadStringProperty(reviewer, "username", "待处理"),
+                ReviewerId = task.ReviewerID,
+                Reviewer = reviewer,
+                ReviewNotes = task.ReviewNotes ?? string.Empty,
+                CreateTime = task.CreatedAt.ToString("yyyy-MM-dd HH:mm"),
+                ProcessTime = task.ProcessedAt?.ToString("yyyy-MM-dd HH:mm") ?? "待处理",
+                CanProcess = canProcess
+            };
+        }
+
+        private async Task<object?> BuildTargetSummaryAsync(ReviewTask task, object? changeData)
+        {
+            return task.ActionCode switch
+            {
+                ReviewActions.ApplyAdmin or ReviewActions.TreeApplyRole => await BuildUserSummaryAsync(task.TargetID),
+                ReviewActions.TreeCreate => BuildTreeSummaryFromPayload(task.ActionCode, changeData),
+                ReviewActions.TreeUpdate or ReviewActions.TreeDelete => await BuildTreeSummaryAsync(task.TargetID ?? task.TreeID),
+                ReviewActions.PoemCreate => BuildPoemSummaryFromPayload(changeData),
+                ReviewActions.PoemUpdate or ReviewActions.PoemDelete => await BuildPoemSummaryAsync(task.TargetID),
+                _ => null
+            };
+        }
+
+        private async Task<object?> BuildUserSummaryAsync(Guid? userId)
+        {
+            if (userId == null)
+            {
+                return null;
+            }
+
+            var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.UserID == userId.Value);
+            if (user == null)
+            {
+                return null;
+            }
+
+            return new
+            {
+                userId = user.UserID,
+                username = user.Username,
+                roleType = user.RoleType,
+                roleName = ReviewActions.GetRoleDisplayName(user.RoleType),
+                email = user.Email,
+                phone = user.Phone
+            };
+        }
+
+        private async Task<object?> BuildTreeSummaryAsync(Guid? treeId)
+        {
+            if (treeId == null)
+            {
+                return null;
+            }
+
+            var tree = await _db.GenoTrees.AsNoTracking().FirstOrDefaultAsync(t => t.TreeID == treeId.Value);
+            if (tree == null)
+            {
+                return null;
+            }
+
+            return new
+            {
+                treeId = tree.TreeID,
+                treeName = tree.TreeName,
+                ancestorName = tree.AncestorName,
+                region = tree.Region,
+                description = tree.Description,
+                isPublic = tree.IsPublic,
+                isDeleted = tree.IsDel
+            };
+        }
+
+        private static object? BuildTreeSummaryFromPayload(string actionCode, object? payload)
+        {
+            if (payload == null)
+            {
+                return null;
+            }
+
+            if (actionCode is not (ReviewActions.TreeCreate or ReviewActions.TreeUpdate))
+            {
+                return null;
+            }
+
+            var tree = JsonSerializer.Deserialize<GenoTreeDtos>(JsonSerializer.Serialize(payload, JsonDefaults.Options), JsonDefaults.Options);
+            if (tree == null)
+            {
+                return null;
+            }
+
+            return new
+            {
+                treeName = tree.TreeName,
+                ancestorName = tree.AncestorName,
+                region = tree.Region,
+                description = tree.Description,
+                isPublic = tree.IsPublic
+            };
+        }
+
+        private async Task<object?> BuildPoemSummaryAsync(Guid? poemId)
+        {
+            if (poemId == null)
+            {
+                return null;
+            }
+
+            var poem = await _db.GenoGenerationPoems.AsNoTracking().FirstOrDefaultAsync(p => p.PoemID == poemId.Value);
+            if (poem == null)
+            {
+                return null;
+            }
+
+            return new
+            {
+                poemId = poem.PoemID,
+                treeId = poem.TreeID,
+                generationNum = poem.GenerationNum,
+                word = poem.Word,
+                meaning = poem.Meaning,
+                isDeleted = poem.IsDel
+            };
+        }
+
+        private static object? BuildPoemSummaryFromPayload(object? payload)
+        {
+            if (payload == null)
+            {
+                return null;
+            }
+
+            var poem = JsonSerializer.Deserialize<PoemDto>(JsonSerializer.Serialize(payload, JsonDefaults.Options), JsonDefaults.Options);
+            if (poem == null)
+            {
+                return null;
+            }
+
+            return new
+            {
+                treeId = poem.TreeId,
+                generationNum = poem.GenerationNum,
+                word = poem.Word,
+                meaning = poem.Meaning
+            };
+        }
+
+        private static object? DeserializeJson(string json)
+        {
+            try
+            {
+                return JsonSerializer.Deserialize<object>(json, JsonDefaults.Options);
+            }
+            catch
+            {
+                return json;
+            }
+        }
+
+        private static string ReadStringProperty(object? source, string name, string fallback)
+        {
+            var value = source?.GetType().GetProperty(name)?.GetValue(source)?.ToString();
+            return string.IsNullOrWhiteSpace(value) ? fallback : value;
+        }
+
+        private static string GetTargetType(string actionCode) => actionCode switch
+        {
+            ReviewActions.ApplyAdmin => "system-user",
+            ReviewActions.TreeApplyRole => "tree-user",
+            ReviewActions.TreeCreate or ReviewActions.TreeUpdate or ReviewActions.TreeDelete => "tree",
+            ReviewActions.PoemCreate or ReviewActions.PoemUpdate or ReviewActions.PoemDelete => "poem",
+            _ => "unknown"
+        };
+    }
 }

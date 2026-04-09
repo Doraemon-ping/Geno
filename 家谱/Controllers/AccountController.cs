@@ -20,19 +20,12 @@
         private readonly IAuthService _authService;
 
         /// <summary>
-        /// Defines the _reviewService
-        /// </summary>
-        private readonly IReviewService _reviewService;
-
-        /// <summary>
         /// Initializes a new instance of the <see cref="AccountController"/> class.
         /// </summary>
         /// <param name="authService">The authService<see cref="IAuthService"/></param>
-        /// <param name="reviewService">The reviewService<see cref="IReviewService"/></param>
-        public AccountController(IAuthService authService, IReviewService reviewService)
+        public AccountController(IAuthService authService)
         {
             _authService = authService;
-            _reviewService = reviewService;
         }
 
         /// <summary>
@@ -137,7 +130,7 @@
         public async Task<IActionResult> GetProfile()
         {
             // 如果还没进到这一步就 401 了，说明是 Program.cs 里的 AddJwtBearer 配置有问题
-            if (!User.Identity.IsAuthenticated)
+            if (User.Identity?.IsAuthenticated != true)
             {
                 System.Console.WriteLine("{ debug = 虽然进了方法，但 Identity 依然显示未认证 }");
             }

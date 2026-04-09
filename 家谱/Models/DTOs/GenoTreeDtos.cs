@@ -15,7 +15,8 @@ namespace 家谱.Models.DTOs
         public string? Region { get; set; }
 
         public string? Description { get; set; }
-        public Guid Owner { get; set; }
+
+        public Guid? Owner { get; set; }
 
         public bool IsPublic { get; set; } = false;
     }

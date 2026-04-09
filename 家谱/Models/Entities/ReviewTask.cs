@@ -15,7 +15,6 @@ namespace 家谱.Models.Entities
         /// <summary>
         /// 所属家谱树 ID
         /// </summary>
-        [Required]
         public Guid? TreeID { get; set; }
 
         /// <summary>
@@ -80,7 +79,7 @@ namespace 家谱.Models.Entities
         public virtual SysUser? Reviewer { get; set; }
 
         [ForeignKey(nameof(TreeID))]
-        public virtual GenoTree Tree { get; set; } = null!;
+        public virtual GenoTree? Tree { get; set; }
 
         #endregion
     }

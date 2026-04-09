@@ -6,6 +6,8 @@
     /// </summary>
     public class TaskDtos
     {
+        public string ActionCode { get; set; } = string.Empty;
+
         /// <summary>
         /// Gets or sets the TaskId 任务ID，唯一标识一个审核任务
         /// </summary>
@@ -16,6 +18,10 @@
         /// </summary>
         public string SubmitterName { get; set; } = string.Empty;
 
+        public Guid SubmitterId { get; set; }
+
+        public object? Submitter { get; set; }
+
         /// <summary>
         /// Gets or sets the ActionName 任务类型名称，如 "修改成员信息"、"申请管理员权限" 等，实际存储中只保存 ActionCode（如 "Member.Update"），通过映射关系获取名称
         /// </summary>
@@ -25,6 +31,16 @@
         /// Gets or sets the ChangeData 变更数据，存储为 JSON 字符串，前端可以根据 ActionCode 解析成具体的对象结构进行显示和处理
         /// </summary>
         public object ChangeData { get; set; } = null!;
+
+        public Guid? TreeId { get; set; }
+
+        public object? TreeSummary { get; set; }
+
+        public Guid? TargetId { get; set; }
+
+        public string? TargetType { get; set; }
+
+        public object? TargetSummary { get; set; }
 
         /// <summary>
         /// Gets or sets the Reason 申请理由，前端提交时由用户填写，存储在 ApplyReason 字段中，方便审核人查看审核动机和背景信息
@@ -41,6 +57,10 @@
         /// </summary>
         public string? ReviewName { get; set; } = string.Empty;
 
+        public Guid? ReviewerId { get; set; }
+
+        public object? Reviewer { get; set; }
+
         /// <summary>
         /// Gets or sets the ReviewNotes 审核备注，审核人处理任务时填写的备注信息，存储在 ReviewNotes 字段中，方便提交人和其他审核人查看审核过程中的沟通和说明，如果任务未处理则该字段可以为空或显示为 "无" 等提示信息
         /// </summary>
@@ -55,5 +75,16 @@
         /// Gets or sets the ProcessTime 任务处理时间，存储在 ProcessedAt 字段中，前端可以根据这个时间显示任务的审核完成时间，如果任务未处理则该字段可以为空或显示为 "待处理" 等提示信息，实际存储中使用 DateTime 类型，前端通过格式化显示为字符串
         /// </summary>
         public string ProcessTime { get; set; } = string.Empty;
+
+        public bool CanProcess { get; set; }
+    }
+
+    public class TaskProcessDto
+    {
+        public Guid TaskId { get; set; }
+
+        public int Action { get; set; }
+
+        public string Notes { get; set; } = string.Empty;
     }
 }

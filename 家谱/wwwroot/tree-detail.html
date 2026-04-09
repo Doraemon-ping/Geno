@@ -1,27 +1,29 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>字辈卷轴 - 赵氏宗亲平台</title>
-    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
             --primary: #8b4513;
             --accent: #a0522d;
+            --gold: #d4af37;
             --paper: #fdfaf2;
-            --ink: #2c1e16;
+            --glass: rgba(255, 255, 255, 0.85);
         }
+
+        * { box-sizing: border-box; }
 
         body {
             margin: 0;
-            font-family: "Noto Serif SC", "楷体", serif;
+            font-family: "Noto Serif SC", "KaiTi", serif;
             background: var(--paper);
-            color: var(--ink);
-            padding-top: 100px;
+            color: #333;
+            padding-top: 80px;
         }
 
-        /* --- 导航栏 (全站统一) --- */
         .navbar {
             position: fixed;
             top: 0;
@@ -31,334 +33,687 @@
             justify-content: space-between;
             align-items: center;
             padding: 0 5%;
-            background: rgba(255, 255, 255, 0.9);
+            background: var(--glass);
             backdrop-filter: blur(10px);
             border-bottom: 1px solid rgba(139, 69, 19, 0.1);
             z-index: 1000;
         }
 
         .logo {
-            font-size: 24px;
-            color: var(--primary);
-            text-decoration: none;
+            font-size: 28px;
             font-weight: bold;
-            letter-spacing: 2px;
+            color: var(--primary);
+            letter-spacing: 4px;
+            text-decoration: none;
         }
 
-        .container {
-            max-width: 1000px;
-            margin: 0 auto;
+        .nav-links {
+            display: flex;
+            gap: 24px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .nav-links a,
+        .nav-links button {
+            text-decoration: none;
+            color: #555;
+            font-size: 16px;
+            background: none;
+            border: none;
+            font-family: inherit;
+            cursor: pointer;
+            padding: 0;
+        }
+
+        .nav-links a:hover,
+        .nav-links button:hover {
+            color: var(--primary);
+        }
+
+        .hero {
+            height: 250px;
+            background:
+                linear-gradient(rgba(44, 30, 22, 0.46), rgba(44, 30, 22, 0.46)),
+                url("https://images.unsplash.com/photo-1516546453174-5e1098a4b4af?q=80&w=1800") center/cover;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            text-align: center;
             padding: 0 20px;
         }
 
-        /* --- 家族树头部概览 --- */
-        .tree-header {
+        .hero h1 {
+            margin: 0 0 10px;
+            font-size: 40px;
+            letter-spacing: 6px;
+        }
+
+        .hero p {
+            margin: 0;
+            max-width: 760px;
+            line-height: 1.8;
+            opacity: 0.92;
+        }
+
+        .container {
+            max-width: 1120px;
+            margin: -40px auto 50px;
+            padding: 0 20px;
+        }
+
+        .panel {
             background: white;
-            padding: 40px;
+            padding: 28px;
             border-radius: 4px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
-            margin-bottom: 40px;
-            border-left: 10px solid var(--primary);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.05);
+            margin-bottom: 24px;
+        }
+
+        .section-title {
+            font-size: 22px;
+            color: var(--primary);
+            border-left: 5px solid var(--primary);
+            padding-left: 15px;
+            margin-bottom: 22px;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            gap: 12px;
         }
 
-        .tree-info h1 {
-            margin: 0;
-            font-size: 28px;
+        .meta-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 18px;
+        }
+
+        .meta-card {
+            background: #faf7f2;
+            border-left: 3px solid var(--gold);
+            padding: 14px 16px;
+            color: #666;
+            line-height: 1.8;
+        }
+
+        .meta-card strong {
+            color: var(--primary);
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .detail-grid {
+            display: grid;
+            grid-template-columns: 1.1fr 0.9fr;
+            gap: 24px;
+        }
+
+        .stack {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .tag {
+            font-size: 12px;
+            padding: 5px 10px;
+            border-radius: 2px;
+            background: #faf7f2;
             color: var(--primary);
         }
 
-        .tree-info p {
-            margin: 10px 0 0;
-            color: #777;
-            font-size: 14px;
+        .message {
+            min-height: 24px;
+            color: #c0392b;
+            margin-bottom: 12px;
         }
 
-        /* --- 字辈活字布局 --- */
-        .poem-section {
-            background: white;
-            padding: 50px;
-            min-height: 600px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.03);
-            position: relative;
-            background-image: radial-gradient(var(--paper) 1px, transparent 0);
-            background-size: 20px 20px; /* 模拟稿纸微纹 */
-        }
-
-        .poem-title {
-            text-align: center;
-            font-size: 24px;
-            letter-spacing: 15px;
-            color: var(--primary);
-            margin-bottom: 50px;
-            border-bottom: 1px double var(--primary);
-            padding-bottom: 20px;
-        }
+        .success { color: #2e7d32; }
 
         .poem-grid {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 25px;
-            justify-content: center;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 18px;
         }
 
-        /* 单个字辈块 */
-        .poem-item {
-            width: 80px;
-            height: 120px;
-            border: 1px solid var(--primary);
+        .poem-card {
+            background: white;
+            border: 1px solid rgba(139, 69, 19, 0.16);
+            border-radius: 4px;
+            min-height: 190px;
             display: flex;
             flex-direction: column;
             cursor: pointer;
-            transition: all 0.3s;
-            background: #fff;
+            transition: 0.35s;
         }
 
-            .poem-item:hover {
-                transform: translateY(-8px);
-                box-shadow: 0 10px 20px rgba(139, 69, 19, 0.15);
-                background: var(--paper);
-            }
+        .poem-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 12px 25px rgba(139, 69, 19, 0.12);
+        }
 
-            .poem-item .gen {
-                font-size: 12px;
-                background: var(--primary);
-                color: #fff;
-                padding: 4px 0;
-                text-align: center;
-                font-family: sans-serif;
-            }
+        .poem-gen {
+            padding: 10px;
+            background: var(--primary);
+            color: white;
+            text-align: center;
+            font-size: 13px;
+        }
 
-            .poem-item .word {
-                flex: 1;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 36px;
-                font-weight: bold;
-                color: var(--primary);
-            }
+        .poem-word {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            color: var(--primary);
+            font-weight: bold;
+        }
 
-        /* --- 交互组件 --- */
-        .btn {
-            padding: 10px 25px;
-            border-radius: 4px;
-            cursor: pointer;
+        .poem-meaning {
+            padding: 12px;
+            border-top: 1px solid #f2ece4;
+            color: #777;
+            font-size: 13px;
+            line-height: 1.7;
+            min-height: 64px;
+        }
+
+        .action-button,
+        .ghost-button,
+        .danger-button {
             border: none;
+            padding: 10px 16px;
+            border-radius: 2px;
+            cursor: pointer;
             font-family: inherit;
-            transition: 0.3s;
         }
 
-        .btn-primary {
+        .action-button {
             background: var(--primary);
             color: white;
         }
 
-        .btn-outline {
-            background: transparent;
-            border: 1px solid var(--primary);
+        .ghost-button {
+            background: white;
             color: var(--primary);
+            border: 1px solid var(--primary);
         }
 
-        #modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.7);
-            z-index: 2000;
-            justify-content: center;
-            align-items: center;
+        .danger-button {
+            background: #fff5f5;
+            color: #c0392b;
         }
 
-        .modal-box {
-            background: #fff;
-            width: 380px;
-            padding: 40px;
-            border-radius: 8px;
-            text-align: center;
+        .note {
+            padding: 12px;
+            background: #faf7f2;
+            color: #666;
+            line-height: 1.8;
+            font-size: 14px;
+            border-left: 3px solid var(--gold);
         }
 
-        input, textarea {
+        .permission-list {
+            display: grid;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .permission-item {
+            padding: 12px 14px;
+            background: #fffdf8;
+            border: 1px solid rgba(139, 69, 19, 0.12);
+        }
+
+        .permission-item strong {
+            color: var(--primary);
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .field {
+            margin-bottom: 16px;
+        }
+
+        .field label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--primary);
+            font-size: 14px;
+        }
+
+        .field input,
+        .field textarea,
+        .field select {
             width: 100%;
             padding: 12px;
-            margin: 15px 0;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            box-sizing: border-box;
+            border: 1px solid rgba(139, 69, 19, 0.18);
+            border-radius: 2px;
+            font-family: inherit;
+            background: #fffdf8;
+        }
+
+        .field textarea {
+            resize: vertical;
+            min-height: 110px;
+        }
+
+        .empty {
+            color: #999;
             text-align: center;
-            font-size: 18px;
+            padding: 30px 10px;
+        }
+
+        .modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.55);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1100;
+            padding: 20px;
+        }
+
+        .modal.show { display: flex; }
+
+        .modal-card {
+            width: min(520px, 100%);
+            background: white;
+            border-radius: 4px;
+            padding: 30px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.22);
+        }
+
+        .modal-card h3 {
+            margin: 0 0 18px;
+            color: var(--primary);
+            font-size: 24px;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 18px;
+        }
+
+        @media (max-width: 900px) {
+            .detail-grid,
+            .meta-grid { grid-template-columns: 1fr; }
+        }
+
+        @media (max-width: 768px) {
+            .navbar { padding: 0 20px; height: auto; min-height: 80px; }
+            .hero h1 { font-size: 30px; }
         }
     </style>
 </head>
 <body>
-
     <nav class="navbar">
-        <a href="index.html" class="logo">赵氏家谱</a>
-        <div style="display:flex; gap:20px;">
-            <a href="index.html" style="text-decoration:none; color:#666">首页</a>
-            <a href="my-trees.html" style="text-decoration:none; color:#666">我的族谱</a>
-            <a href="javascript:history.back()" style="text-decoration:none; color:var(--primary); font-weight:bold">← 返回</a>
+        <a class="logo" href="index.html">赵氏家谱</a>
+        <div class="nav-links">
+            <a href="index.html">首页</a>
+            <a href="my-trees.html">我的族谱</a>
+            <a href="public.html">万姓同根</a>
+            <a href="profile.html">个人中心</a>
+            <button id="logoutBtn">退出</button>
         </div>
     </nav>
 
+    <header class="hero">
+        <h1 id="treeTitle">字辈卷轴</h1>
+        <p id="treeSubtitle">卷宗详情与字辈维护统一在此完成。</p>
+    </header>
+
     <div class="container">
-        <div class="tree-header">
-            <div class="tree-info">
-                <h1 id="treeNameHeader">载入中...</h1>
-                <p id="treeMeta">始祖：-- | 地区：--</p>
+        <div class="panel">
+            <div class="section-title">
+                <span>卷宗概览</span>
+                <div class="stack" id="summaryTags"></div>
             </div>
-            <button class="btn btn-primary" onclick="showAddPoem()">+ 续写字辈</button>
+            <div class="meta-grid">
+                <div class="meta-card">
+                    <strong>始祖</strong>
+                    <span id="ancestorName">--</span>
+                </div>
+                <div class="meta-card">
+                    <strong>地区</strong>
+                    <span id="regionName">--</span>
+                </div>
+                <div class="meta-card">
+                    <strong>字辈数量</strong>
+                    <span id="poemCount">0</span>
+                </div>
+            </div>
         </div>
 
-        <div class="poem-section">
-            <div class="poem-title">宗 族 字 辈 谱</div>
-            <div id="poemList" class="poem-grid">
+        <div class="detail-grid">
+            <div class="panel">
+                <div class="section-title">
+                    <span>字辈列表</span>
+                    <button class="action-button" id="addPoemBtn">新增字辈</button>
+                </div>
+                <div id="message" class="message"></div>
+                <div class="note" id="editNote"></div>
+                <div id="poemGrid" class="poem-grid" style="margin-top:18px;">
+                    <div class="empty">正在翻阅字辈卷轴...</div>
+                </div>
+            </div>
+
+            <div>
+                <div class="panel">
+                    <div class="section-title">我的权限</div>
+                    <div class="note" id="accessNote">正在读取当前权限...</div>
+                </div>
+
+                <div class="panel" id="applyPanel">
+                    <div class="section-title">申请树权限</div>
+                    <div id="applyMessage" class="message"></div>
+                    <div class="field">
+                        <label for="targetRole">申请角色</label>
+                        <select id="targetRole">
+                            <option value="1">树管理员</option>
+                            <option value="2">修谱员</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="applyReason">申请理由</label>
+                        <textarea id="applyReason" placeholder="请说明你希望承担的修谱职责"></textarea>
+                    </div>
+                    <button class="action-button" id="applyBtn">提交申请</button>
+                </div>
+
+                <div class="panel" id="permissionPanel" style="display:none;">
+                    <div class="section-title">当前编修成员</div>
+                    <div id="permissionList" class="permission-list"></div>
+                </div>
             </div>
         </div>
     </div>
 
-    <div id="modal">
-        <div class="modal-box">
-            <h3 id="modalTitle" style="color:var(--primary); margin-top:0;">修订字辈</h3>
-            <input type="hidden" id="currentPoemId">
-
-            <div style="font-size: 13px; color: #888;">世代序号 (如: 12)</div>
-            <input type="number" id="genInput" placeholder="世代">
-
-            <div style="font-size: 13px; color: #888;">字辈汉字</div>
-            <input type="text" id="wordInput" placeholder="汉字" maxlength="1">
-
-            <div style="font-size: 13px; color: #888;">释义 (可选)</div>
-            <textarea id="meaningInput" placeholder="字义补充说明..." rows="2" style="font-size: 14px; text-align: left;"></textarea>
-
-            <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;">
-                <button class="btn btn-primary" onclick="submitPoem()">确认保存</button>
-                <button id="delBtn" class="btn" style="color: red; display: none; background:#fff1f0" onclick="deletePoem()">删除此项</button>
-                <button class="btn btn-outline" onclick="hideModal()">取消</button>
+    <div class="modal" id="modal">
+        <div class="modal-card">
+            <h3 id="modalTitle">新增字辈</h3>
+            <div class="field">
+                <label for="generationNum">世代序号</label>
+                <input id="generationNum" type="number" min="1" placeholder="例如：12">
+            </div>
+            <div class="field">
+                <label for="poemWord">字辈汉字</label>
+                <input id="poemWord" type="text" maxlength="1" placeholder="例如：德">
+            </div>
+            <div class="field">
+                <label for="poemMeaning">释义说明</label>
+                <textarea id="poemMeaning" placeholder="补充该字辈的释义或使用说明"></textarea>
+            </div>
+            <div class="modal-actions">
+                <button class="action-button" id="saveBtn">提交</button>
+                <button class="danger-button" id="deleteBtn" style="display:none">删除</button>
+                <button class="ghost-button" id="cancelBtn">取消</button>
             </div>
         </div>
     </div>
 
     <script>
-        const token = localStorage.getItem('token');
-        const urlParams = new URLSearchParams(window.location.search);
-        const treeId = urlParams.get('id');
-
-        const api = axios.create({
-            baseURL: '/api',
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-
-        window.onload = () => {
-            if (!token || !treeId) return location.href = 'login.html';
-            initData();
+        const token = localStorage.getItem("token");
+        const treeId = new URLSearchParams(location.search).get("id");
+        const modal = document.getElementById("modal");
+        const state = {
+            tree: null,
+            access: null,
+            poems: [],
+            permissions: [],
+            editingId: ""
         };
 
-        async function initData() {
-            try {
-                // 1. 获取家族树基本资料
-                const tree = await api.get(`/GenoTree/Get/${treeId}`).then(r => r.data);
-                document.getElementById('treeNameHeader').innerText = tree.treeName;
-                document.getElementById('treeMeta').innerText = `始祖：${tree.ancestorName || '未详'} | 地区：${tree.region || '未载'}`;
-
-                // 2. 获取字辈列表
-                loadPoemList();
-            } catch (e) {
-                console.error("加载数据失败", e);
-            }
+        if (!token || !treeId) {
+            location.href = `login.html?redirect=${encodeURIComponent(`tree-detail.html?id=${treeId || ""}`)}`;
         }
 
-        async function loadPoemList() {
-            const res = await api.get(`/Poem/tree/${treeId}`).then(r => r.data);
-            const list = res.data || [];
+        function authHeaders(json = false) {
+            const headers = { Authorization: `Bearer ${token}` };
+            if (json) headers["Content-Type"] = "application/json";
+            return headers;
+        }
 
-            // 按世代排序
-            list.sort((a, b) => a.generationNum - b.generationNum);
+        async function requestJson(url, options = {}) {
+            const response = await fetch(url, options);
+            const contentType = response.headers.get("content-type") || "";
+            const payload = contentType.includes("application/json") ? await response.json() : await response.text();
+            if (!response.ok) {
+                const errorMessage = typeof payload === "string" ? payload : payload?.message;
+                throw new Error(errorMessage || "请求失败");
+            }
+            return payload;
+        }
 
-            const container = document.getElementById('poemList');
-            if (list.length === 0) {
-                container.innerHTML = `<p style="color:#999; margin-top:100px; font-style:italic;">虚位以待，请点击上方按钮添加第一世字辈。</p>`;
+        function setMessage(text, success = false, id = "message") {
+            const element = document.getElementById(id);
+            element.textContent = text || "";
+            element.className = success ? "message success" : "message";
+        }
+
+        function workflowMessage(result, fallback) {
+            return result?.data?.message || result?.message || fallback;
+        }
+
+        function resetForm() {
+            state.editingId = "";
+            document.getElementById("modalTitle").textContent = "新增字辈";
+            document.getElementById("generationNum").value = "";
+            document.getElementById("poemWord").value = "";
+            document.getElementById("poemMeaning").value = "";
+            document.getElementById("deleteBtn").style.display = "none";
+        }
+
+        function renderSummary() {
+            const tree = state.tree || {};
+            const access = state.access || {};
+            document.getElementById("treeTitle").textContent = tree.treeName || "字辈卷轴";
+            document.getElementById("treeSubtitle").textContent = tree.description || "卷宗详情与字辈维护统一在此完成。";
+            document.getElementById("ancestorName").textContent = tree.ancestorName || "未载";
+            document.getElementById("regionName").textContent = tree.region || "未标注";
+            document.getElementById("poemCount").textContent = state.poems.length;
+
+            const tags = [];
+            tags.push(`<span class="tag">${access.roleName || "访客"}</span>`);
+            tags.push(`<span class="tag">${tree.isPublic ? "公开卷宗" : "私有卷宗"}</span>`);
+            if (access.canEdit) {
+                tags.push('<span class="tag">可直接维护</span>');
+            } else {
+                tags.push('<span class="tag">操作需审核</span>');
+            }
+            document.getElementById("summaryTags").innerHTML = tags.join("");
+            document.getElementById("editNote").textContent = access.canEdit
+                ? "你拥有本树的直接维护权限，字辈的新增、修改、删除会立即生效。"
+                : "你当前没有直接维护权限，字辈的新增、修改、删除都会提交给该树审核人处理。";
+            document.getElementById("accessNote").textContent = access.canEdit
+                ? `当前身份：${access.roleName}。你可以直接维护卷宗内容，并处理本树相关的待审核任务。`
+                : `当前身份：${access.roleName || "访客"}。如果需要直接维护本树，可在下方申请树管理员或修谱员权限。`;
+
+            document.getElementById("applyPanel").style.display = access.canEdit ? "none" : "block";
+            document.getElementById("permissionPanel").style.display = Array.isArray(state.permissions) && state.permissions.length ? "block" : "none";
+            document.getElementById("addPoemBtn").textContent = access.canEdit ? "新增字辈" : "提交字辈申请";
+        }
+
+        function renderPermissions() {
+            const list = document.getElementById("permissionList");
+            if (!state.permissions.length) {
+                list.innerHTML = '<div class="empty">当前还没有可展示的编修成员。</div>';
                 return;
             }
 
-            container.innerHTML = list.map(p => `
-                    <div class="poem-item" onclick="showEditPoem('${p.poemID}', ${p.generationNum}, '${p.word}', '${p.meaning || ''}')">
-                        <div class="gen">第${p.generationNum}世</div>
-                        <div class="word">${p.word}</div>
-                    </div>
-                `).join('');
+            list.innerHTML = state.permissions.map(item => `
+                <div class="permission-item">
+                    <strong>${item.username} · ${item.roleName}${item.isOwner ? "（创建人）" : ""}</strong>
+                    <div>邮箱：${item.email || "未填写"}</div>
+                    <div>电话：${item.phone || "未填写"}</div>
+                </div>
+            `).join("");
         }
 
-        // 弹窗逻辑
-        function showAddPoem() {
-            resetModal();
-            document.getElementById('modalTitle').innerText = "续写字辈";
-            document.getElementById('modal').style.display = 'flex';
+        function renderPoems() {
+            const grid = document.getElementById("poemGrid");
+            if (!state.poems.length) {
+                grid.innerHTML = '<div class="empty">当前卷宗尚无字辈，点击上方按钮即可补充第一世。</div>';
+                return;
+            }
+
+            grid.innerHTML = state.poems.map(poem => `
+                <div class="poem-card" onclick="editPoem('${poem.poemID}')">
+                    <div class="poem-gen">第 ${poem.generationNum} 世</div>
+                    <div class="poem-word">${poem.word}</div>
+                    <div class="poem-meaning">${poem.meaning || "暂无释义说明"}</div>
+                </div>
+            `).join("");
         }
 
-        function showEditPoem(id, gen, word, meaning) {
-            resetModal();
-            document.getElementById('currentPoemId').value = id;
-            document.getElementById('genInput').value = gen;
-            document.getElementById('wordInput').value = word;
-            document.getElementById('meaningInput').value = meaning;
-            document.getElementById('modalTitle').innerText = "修订字辈";
-            document.getElementById('delBtn').style.display = 'block';
-            document.getElementById('modal').style.display = 'flex';
+        async function loadTree() {
+            const tree = await requestJson(`/api/GenoTree/Get/${treeId}`, { headers: authHeaders() });
+            state.tree = tree;
+            state.access = tree.access || {};
+            state.permissions = Array.isArray(tree.permissions) ? tree.permissions : [];
+            renderSummary();
+            renderPermissions();
         }
 
-        function hideModal() { document.getElementById('modal').style.display = 'none'; }
-        function resetModal() {
-            document.getElementById('currentPoemId').value = "";
-            document.getElementById('genInput').value = "";
-            document.getElementById('wordInput').value = "";
-            document.getElementById('meaningInput').value = "";
-            document.getElementById('delBtn').style.display = 'none';
+        async function loadPoems() {
+            const result = await requestJson(`/api/Poem/tree/${treeId}`, { headers: authHeaders() });
+            state.poems = Array.isArray(result.data) ? result.data.slice().sort((a, b) => a.generationNum - b.generationNum) : [];
+            renderPoems();
+            if (state.tree) {
+                document.getElementById("poemCount").textContent = state.poems.length;
+            }
         }
 
-        // 提交数据
-        async function submitPoem() {
-            const poemId = document.getElementById('currentPoemId').value;
-            const dto = {
-                treeId: treeId,
-                generationNum: parseInt(document.getElementById('genInput').value),
-                word: document.getElementById('wordInput').value,
-                meaning: document.getElementById('meaningInput').value
+        function openModal() {
+            modal.classList.add("show");
+        }
+
+        function closeModal() {
+            modal.classList.remove("show");
+            resetForm();
+        }
+
+        function editPoem(id) {
+            const poem = state.poems.find(item => item.poemID === id);
+            if (!poem) return;
+            state.editingId = id;
+            document.getElementById("modalTitle").textContent = state.access?.canEdit ? "修改字辈" : "提交字辈修改申请";
+            document.getElementById("generationNum").value = poem.generationNum;
+            document.getElementById("poemWord").value = poem.word || "";
+            document.getElementById("poemMeaning").value = poem.meaning || "";
+            document.getElementById("deleteBtn").style.display = "inline-block";
+            document.getElementById("saveBtn").textContent = state.access?.canEdit ? "保存" : "提交审核";
+            openModal();
+        }
+
+        async function savePoem() {
+            setMessage("");
+            const payload = {
+                treeId,
+                generationNum: Number(document.getElementById("generationNum").value),
+                word: document.getElementById("poemWord").value.trim(),
+                meaning: document.getElementById("poemMeaning").value.trim()
             };
 
+            if (!payload.generationNum || !payload.word) {
+                setMessage("请填写世代序号和字辈汉字。");
+                return;
+            }
+
             try {
-                if (poemId) {
-                    // 对接 PUT /api/Poem/Update?poemId={id}
-                    await api.put(`/Poem/Update?poemId=${poemId}`, dto);
+                let result;
+                if (state.editingId) {
+                    result = await requestJson(`/api/Poem/Update?poemId=${state.editingId}`, {
+                        method: "PUT",
+                        headers: authHeaders(true),
+                        body: JSON.stringify(payload)
+                    });
                 } else {
-                    // 对接 POST /api/Poem/Add
-                    await api.post('/Poem/Add', dto);
+                    result = await requestJson("/api/Poem/Add", {
+                        method: "POST",
+                        headers: authHeaders(true),
+                        body: JSON.stringify(payload)
+                    });
                 }
-                hideModal();
-                loadPoemList();
-            } catch (e) {
-                alert("保存失败，请检查世代序号是否重复或格式错误。");
+
+                setMessage(workflowMessage(result, "操作成功"), true);
+                closeModal();
+                loadPoems();
+            } catch (error) {
+                setMessage(error.message);
             }
         }
 
-        // 删除数据
         async function deletePoem() {
-            const id = document.getElementById('currentPoemId').value;
-            if (!confirm("确定要永久移除此世代字辈吗？")) return;
+            if (!state.editingId || !confirm("确定删除这个字辈吗？")) return;
+            try {
+                const result = await requestJson(`/api/Poem/Del/${state.editingId}`, {
+                    method: "DELETE",
+                    headers: authHeaders()
+                });
+                setMessage(workflowMessage(result, "操作成功"), true);
+                closeModal();
+                loadPoems();
+            } catch (error) {
+                setMessage(error.message);
+            }
+        }
+
+        async function applyRole() {
+            setMessage("", false, "applyMessage");
+            const payload = {
+                treeId,
+                newRole: Number(document.getElementById("targetRole").value),
+                reason: document.getElementById("applyReason").value.trim()
+            };
+
+            if (!payload.reason) {
+                setMessage("请先填写申请理由。", false, "applyMessage");
+                return;
+            }
 
             try {
-                await api.delete(`/Poem/Del/${id}`);
-                hideModal();
-                loadPoemList();
-            } catch (e) {
-                alert("删除失败");
+                const result = await requestJson("/api/Apply/apply-tree-role", {
+                    method: "POST",
+                    headers: authHeaders(true),
+                    body: JSON.stringify(payload)
+                });
+                setMessage(workflowMessage(result, "申请已提交"), true, "applyMessage");
+                document.getElementById("applyReason").value = "";
+            } catch (error) {
+                setMessage(error.message, false, "applyMessage");
             }
         }
+
+        document.getElementById("addPoemBtn").addEventListener("click", () => {
+            resetForm();
+            document.getElementById("modalTitle").textContent = state.access?.canEdit ? "新增字辈" : "提交字辈新增申请";
+            document.getElementById("saveBtn").textContent = state.access?.canEdit ? "保存" : "提交审核";
+            openModal();
+        });
+        document.getElementById("saveBtn").addEventListener("click", savePoem);
+        document.getElementById("deleteBtn").addEventListener("click", deletePoem);
+        document.getElementById("cancelBtn").addEventListener("click", closeModal);
+        document.getElementById("applyBtn").addEventListener("click", applyRole);
+        document.getElementById("logoutBtn").addEventListener("click", () => {
+            localStorage.removeItem("token");
+            location.href = "index.html";
+        });
+        modal.addEventListener("click", event => {
+            if (event.target === modal) closeModal();
+        });
+
+        Promise.all([loadTree(), loadPoems()]).catch(error => {
+            document.getElementById("poemGrid").innerHTML = `<div class="empty">${error.message}</div>`;
+        });
+
+        window.editPoem = editPoem;
     </script>
 </body>
 </html>

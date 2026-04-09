@@ -1,31 +1,50 @@
-﻿namespace 家谱.Controllers
-{
-    using Microsoft.AspNetCore.Authorization;
-    using Microsoft.AspNetCore.Mvc;
-    using System.Security.Claims;
-    using 家谱.Models.DTOs;
-    using 家谱.Models.Entities;
-    using 家谱.Services;
+using System.Security.Claims;
+using System.Text.Json;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using 家谱.Common;
+using 家谱.Models.DTOs;
+using 家谱.Models.DTOs.Common;
+using 家谱.Models.Enums;
+using 家谱.Services;
 
-    [Authorize] // 必须登录
+namespace 家谱.Controllers
+{
+    [Authorize]
     [ApiController]
     [Route("api/[controller]")]
     public class GenoTreeController : ControllerBase
     {
         private readonly IGenoTreeService _treeService;
+        private readonly IReviewService _reviewService;
+        private readonly ITreePermissionService _treePermissionService;
 
-        public GenoTreeController(IGenoTreeService treeService)
+        public GenoTreeController(
+            IGenoTreeService treeService,
+            IReviewService reviewService,
+            ITreePermissionService treePermissionService)
         {
             _treeService = treeService;
+            _reviewService = reviewService;
+            _treePermissionService = treePermissionService;
         }
-
-        // 辅助方法：从 Token 中安全获取用户 ID
 
         private Guid GetCurrentUserId()
         {
             var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userIdStr)) return Guid.Empty;
-            return Guid.Parse(userIdStr);
+            if (!Guid.TryParse(userIdStr, out var userId))
+                throw new UnauthorizedAccessException("无法解析当前用户身份");
+
+            return userId;
+        }
+
+        private byte GetCurrentUserRole()
+        {
+            var roleClaim = User.FindFirst(ClaimTypes.Role)?.Value;
+            if (!byte.TryParse(roleClaim, out var role))
+                throw new UnauthorizedAccessException("无法解析当前用户角色");
+
+            return role;
         }
 
         [HttpPost("Add")]
@@ -34,29 +53,67 @@
             var userId = GetCurrentUserId();
             if (dto == null)
                 throw new ArgumentNullException(nameof(dto), "请求体不能为空");
-            dto.Owner = userId; // 强制绑定当前用户为树的拥有者
-            var success = await _treeService.CreateAsync(dto);
 
-            if (!success) return BadRequest(new { message = "创建失败" });
-            return Ok(new { message = "家族树创建成功" });
+            dto.Owner = userId;
+            if (GetCurrentUserRole() == (byte)RoleType.SuperAdmin)
+            {
+                var tree = await _treeService.CreateAsync(dto, userId, userId);
+                return Ok(ApiResponse.OK(new WorkflowResultDto
+                {
+                    AppliedDirectly = true,
+                    Message = "家谱树创建成功",
+                    Data = new { treeId = tree.TreeID }
+                }));
+            }
+
+            var taskId = await _reviewService.SubmitAsync(new SubmitReviewRequest
+            {
+                ActionCode = ReviewActions.TreeCreate,
+                ChangeData = JsonSerializer.Serialize(dto, JsonDefaults.Options),
+                Reason = "普通用户提交新建家谱树申请",
+                ForceCreateTask = true
+            }, userId);
+
+            return Ok(ApiResponse.OK(new WorkflowResultDto
+            {
+                SubmittedForReview = true,
+                TaskId = taskId,
+                Message = "已提交创建申请，等待审核"
+            }));
         }
 
         [HttpGet("my-trees")]
         public async Task<IActionResult> GetMyTrees()
         {
             var userId = GetCurrentUserId();
-            var trees = await _treeService.GetByOwner(userId);
-            return Ok(trees);
+            var trees = await _treeService.GetAccessibleTreesAsync(userId);
+            var result = new List<object>();
+            foreach (var tree in trees)
+            {
+                var access = await _treePermissionService.GetTreeAccessAsync(tree.TreeID, userId);
+                result.Add(new
+                {
+                    tree.TreeID,
+                    tree.TreeName,
+                    tree.AncestorName,
+                    tree.Region,
+                    tree.Description,
+                    tree.OwnerID,
+                    tree.IsPublic,
+                    tree.CreateTime,
+                    tree.IsDel,
+                    Poems = tree.Poems,
+                    Access = access
+                });
+            }
+
+            return Ok(result);
         }
 
-        [AllowAnonymous] // 允许不登录查看公开列表
+        [AllowAnonymous]
         [HttpGet("GetAll")]
         public async Task<IActionResult> GetAllPublic()
         {
-            if (User == null || !User.Identity.IsAuthenticated || byte.Parse(User.FindFirst(ClaimTypes.Role)!.Value) > 2)
-                throw new UnauthorizedAccessException("无权限访问此资源");
-            //只允许管理员访问公开列表，普通用户无法访问
-            // 你现有的 GetAll 是获取所有，通常建议在这里过滤 IsPublic == true
             var trees = await _treeService.GetAll();
             return Ok(trees.Where(t => t.IsPublic));
         }
@@ -67,37 +124,113 @@
             var tree = await _treeService.GetByIdAsync(id);
             if (tree == null) return NotFound(new { message = "未找到家族树" });
 
-            // 权限检查：如果是私有的且不是本人
-            if (!tree.IsPublic && tree.OwnerID != GetCurrentUserId())
+            var currentUserId = GetCurrentUserId();
+            if (!await _treePermissionService.CanViewTreeAsync(tree, currentUserId))
             {
-                return Forbid(); // 或返回 404 隐藏存在性
+                return Forbid();
             }
 
-            return Ok(tree);
+            var access = await _treePermissionService.GetTreeAccessAsync(id, currentUserId);
+            var permissions = access.CanManagePermissions
+                ? await _treePermissionService.GetPermissionsAsync(id)
+                : new List<TreePermissionDto>();
+
+            return Ok(new
+            {
+                tree.TreeID,
+                tree.TreeName,
+                tree.AncestorName,
+                tree.Region,
+                tree.Description,
+                tree.OwnerID,
+                tree.IsPublic,
+                tree.CreateTime,
+                Poems = tree.Poems,
+                Access = access,
+                Permissions = permissions
+            });
         }
 
         [HttpPut("Update/{id}")]
         public async Task<IActionResult> Update(Guid id, [FromBody] GenoTreeDtos dto)
         {
-            // 业务安全性：先检查这棵树是不是你的
             var existingTree = await _treeService.GetByIdAsync(id);
             if (existingTree == null) return NotFound();
-            if (existingTree.OwnerID != GetCurrentUserId()) return Forbid();
 
-            var success = await _treeService.UpdateAsync(dto, id);
-            return success ? Ok(new { message = "更新成功" }) : BadRequest();
+            var userId = GetCurrentUserId();
+            if (!await _treePermissionService.CanViewTreeAsync(existingTree, userId))
+            {
+                return Forbid();
+            }
+
+            if (GetCurrentUserRole() == (byte)RoleType.SuperAdmin || await _treePermissionService.CanEditTreeAsync(id, userId))
+            {
+                var success = await _treeService.UpdateAsync(dto, id, userId);
+                return success
+                    ? Ok(ApiResponse.OK(new WorkflowResultDto { AppliedDirectly = true, Message = "更新成功" }))
+                    : BadRequest();
+            }
+
+            var taskId = await _reviewService.SubmitAsync(new SubmitReviewRequest
+            {
+                TreeId = id,
+                TargetId = id,
+                ActionCode = ReviewActions.TreeUpdate,
+                ChangeData = JsonSerializer.Serialize(dto, JsonDefaults.Options),
+                Reason = "普通用户提交家谱树修改申请"
+            }, userId);
+
+            return Ok(ApiResponse.OK(new WorkflowResultDto
+            {
+                SubmittedForReview = true,
+                TaskId = taskId,
+                Message = "修改申请已提交，等待审核"
+            }));
         }
 
         [HttpDelete("Del/{id}")]
         public async Task<IActionResult> Delete(Guid id)
         {
-            // 业务安全性：先检查归属权
             var existingTree = await _treeService.GetByIdAsync(id);
             if (existingTree == null) return NotFound();
-            if (existingTree.OwnerID != GetCurrentUserId()) return Forbid();
 
-            var success = await _treeService.DeleteAsync(id);
-            return success ? Ok(new { message = "删除成功" }) : BadRequest();
+            var userId = GetCurrentUserId();
+            if (!await _treePermissionService.CanViewTreeAsync(existingTree, userId))
+            {
+                return Forbid();
+            }
+
+            if (GetCurrentUserRole() == (byte)RoleType.SuperAdmin || await _treePermissionService.CanEditTreeAsync(id, userId))
+            {
+                var success = await _treeService.DeleteAsync(id, userId);
+                return success
+                    ? Ok(ApiResponse.OK(new WorkflowResultDto { AppliedDirectly = true, Message = "删除成功" }))
+                    : BadRequest();
+            }
+
+            var taskId = await _reviewService.SubmitAsync(new SubmitReviewRequest
+            {
+                TreeId = id,
+                TargetId = id,
+                ActionCode = ReviewActions.TreeDelete,
+                ChangeData = JsonSerializer.Serialize(new
+                {
+                    existingTree.TreeID,
+                    existingTree.TreeName,
+                    existingTree.AncestorName,
+                    existingTree.Region,
+                    existingTree.Description,
+                    existingTree.IsPublic
+                }, JsonDefaults.Options),
+                Reason = "普通用户提交家谱树删除申请"
+            }, userId);
+
+            return Ok(ApiResponse.OK(new WorkflowResultDto
+            {
+                SubmittedForReview = true,
+                TaskId = taskId,
+                Message = "删除申请已提交，等待审核"
+            }));
         }
     }
 }

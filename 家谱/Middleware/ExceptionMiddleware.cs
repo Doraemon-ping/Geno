@@ -2,7 +2,6 @@
 {
     using System.Net;
     using System.Text.Json;
-    using Volo.Abp;
 
     public class ExceptionMiddleware
     {
@@ -39,11 +38,19 @@
 
         private static async Task HandleExceptionAsync(HttpContext context, Exception exception)
         {
+            var statusCode = exception switch
+            {
+                ArgumentException => (int)HttpStatusCode.BadRequest,
+                UnauthorizedAccessException => (int)HttpStatusCode.Unauthorized,
+                _ => (int)HttpStatusCode.InternalServerError
+            };
+
             context.Response.ContentType = "application/json; charset=utf-8"; // 明确指定 UTF-8
+            context.Response.StatusCode = statusCode;
 
             var response = new ErrorResponse
             {
-                Code = 500,
+                Code = statusCode,
                 Message = exception.Message
             };
 

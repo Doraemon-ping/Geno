@@ -1,115 +1,173 @@
-﻿namespace 家谱.Services
+using Microsoft.EntityFrameworkCore;
+using 家谱.DB;
+using 家谱.Models.DTOs;
+using 家谱.Models.Entities;
+
+namespace 家谱.Services
 {
-    using Microsoft.EntityFrameworkCore;
-    using 家谱.DB;
-    using 家谱.Models.DTOs;
-    using 家谱.Models.Entities;
-
-    // 这个服务类目前是空的，未来可以添加与家谱树相关的业务逻辑方法，例如：
-
     public interface IGenoTreeService
     {
-        // 创建家谱树
-
-        Task<bool> CreateAsync(GenoTreeDtos dto);
-
-        // 获取所有家谱树列表
+        Task<GenoTree> CreateAsync(GenoTreeDtos dto, Guid ownerId, Guid operatorUserId, Guid? taskId = null);
 
         Task<List<GenoTree>> GetAll();
 
-        // 根据 ID 获取家谱树详情
-
         Task<GenoTree?> GetByIdAsync(Guid id);
 
-        //deletr
+        Task<bool> DeleteAsync(Guid id, Guid operatorUserId, Guid? taskId = null);
 
-        Task<bool> DeleteAsync(Guid id);
+        Task<List<GenoTree>> GetAccessibleTreesAsync(Guid userId);
 
-        //GetByOwnerIdAsync(Guid ownerId);
-
-        Task<List<GenoTree>> GetByOwner(Guid owner);
-
-        //UpdateAsync(GenoTreeDtos dto);
-
-        Task<bool> UpdateAsync(GenoTreeDtos dto, Guid guid);
+        Task<bool> UpdateAsync(GenoTreeDtos dto, Guid guid, Guid operatorUserId, Guid? taskId = null);
     }
 
     public class GenoTreeService : IGenoTreeService
     {
         private readonly GenealogyDbContext _db;
+        private readonly IAuditLogService _auditLogService;
+        private readonly ITreePermissionService _treePermissionService;
 
-        public GenoTreeService(GenealogyDbContext dbContext)
+        public GenoTreeService(
+            GenealogyDbContext dbContext,
+            IAuditLogService auditLogService,
+            ITreePermissionService treePermissionService)
         {
             _db = dbContext;
+            _auditLogService = auditLogService;
+            _treePermissionService = treePermissionService;
         }
 
-        // 创建家谱树
-
-        public async Task<bool> CreateAsync(GenoTreeDtos dto)
+        public async Task<GenoTree> CreateAsync(GenoTreeDtos dto, Guid ownerId, Guid operatorUserId, Guid? taskId = null)
         {
-
-            GenoTree tree = new GenoTree
+            var tree = new GenoTree
             {
+                TreeID = Guid.NewGuid(),
                 TreeName = dto.TreeName,
                 AncestorName = dto.AncestorName,
                 Region = dto.Region,
                 Description = dto.Description,
                 IsPublic = dto.IsPublic,
-                OwnerID = dto.Owner
+                OwnerID = ownerId,
+                CreateTime = DateTime.UtcNow,
+                IsDel = false
             };
+
             await _db.GenoTrees.AddAsync(tree);
-            return await _db.SaveChangesAsync() > 0;
+            await _db.SaveChangesAsync();
+            await _treePermissionService.UpsertPermissionAsync(tree.TreeID, ownerId, 1, operatorUserId);
+            await _auditLogService.WriteAsync("Geno_Trees", tree.TreeID, "CREATE", operatorUserId, new { }, taskId);
+            return tree;
         }
 
-        public async Task<bool> DeleteAsync(Guid id)
+        public async Task<bool> DeleteAsync(Guid id, Guid operatorUserId, Guid? taskId = null)
         {
-            var tree = _db.GenoTrees.Find(id);
-            if (tree != null)
+            var tree = await _db.GenoTrees.FirstOrDefaultAsync(t => t.TreeID == id && !t.IsDel);
+            if (tree == null)
             {
-                _db.GenoTrees.Remove(tree);
-                return await _db.SaveChangesAsync() > 0;
+                return false;
             }
-            return false;
-        }
 
-        // 获取所有家谱树列表
+            var before = new
+            {
+                tree.TreeID,
+                tree.TreeName,
+                tree.AncestorName,
+                tree.Region,
+                tree.Description,
+                tree.OwnerID,
+                tree.IsPublic
+            };
+
+            tree.IsDel = true;
+
+            var poems = await _db.GenoGenerationPoems.Where(p => p.TreeID == id && !p.IsDel).ToListAsync();
+            foreach (var poem in poems)
+            {
+                poem.IsDel = true;
+            }
+
+            var permissions = await _db.TreePermissions.Where(p => p.TreeID == id && p.IsActive).ToListAsync();
+            foreach (var permission in permissions)
+            {
+                permission.IsActive = false;
+                permission.UpdatedAt = DateTime.UtcNow;
+            }
+
+            await _db.SaveChangesAsync();
+            await _auditLogService.WriteAsync("Geno_Trees", tree.TreeID, "DELETE", operatorUserId, before, taskId);
+            return true;
+        }
 
         public async Task<List<GenoTree>> GetAll()
         {
             var trees = await _db.GenoTrees
-                .Include(t => t.Poems) // 包含字辈信息
+                .Where(t => !t.IsDel)
+                .OrderByDescending(t => t.CreateTime)
                 .ToListAsync();
+
+            await AttachPoemsAsync(trees);
             return trees;
         }
 
-        // 根据 ID 获取家谱树详情
-
         public async Task<GenoTree?> GetByIdAsync(Guid id)
         {
-            return await _db.GenoTrees
-                .Include(t => t.Poems) // 包含字辈信息
-                .FirstOrDefaultAsync(t => t.TreeID == id);
+            var tree = await _db.GenoTrees.FirstOrDefaultAsync(t => t.TreeID == id && !t.IsDel);
+            if (tree == null)
+            {
+                return null;
+            }
+
+            await AttachPoemsAsync(new List<GenoTree> { tree });
+            return tree;
         }
 
-        // 根据所有者 ID 获取家谱树列表
-
-        public async Task<List<GenoTree>> GetByOwner(Guid owner)
+        public Task<List<GenoTree>> GetAccessibleTreesAsync(Guid userId)
         {
-            return await _db.GenoTrees
-                .Include(t => t.Poems)
-                .Where(t => t.OwnerID == owner).ToListAsync();
+            return _treePermissionService.GetAccessibleTreesAsync(userId);
         }
 
-        public async Task<bool> UpdateAsync(GenoTreeDtos dto, Guid guid)
+        public async Task<bool> UpdateAsync(GenoTreeDtos dto, Guid guid, Guid operatorUserId, Guid? taskId = null)
         {
-            var oldTree = await _db.GenoTrees.FindAsync(guid);
-            if (oldTree == null) return false;
+            var oldTree = await _db.GenoTrees.FirstOrDefaultAsync(t => t.TreeID == guid && !t.IsDel);
+            if (oldTree == null)
+            {
+                return false;
+            }
+
+            var before = new
+            {
+                oldTree.TreeID,
+                oldTree.TreeName,
+                oldTree.AncestorName,
+                oldTree.Region,
+                oldTree.Description,
+                oldTree.IsPublic
+            };
+
             oldTree.TreeName = dto.TreeName;
             oldTree.AncestorName = dto.AncestorName;
             oldTree.Region = dto.Region;
             oldTree.Description = dto.Description;
             oldTree.IsPublic = dto.IsPublic;
-            return await _db.SaveChangesAsync() > 0;
+
+            await _db.SaveChangesAsync();
+            await _auditLogService.WriteAsync("Geno_Trees", oldTree.TreeID, "UPDATE", operatorUserId, before, taskId);
+            return true;
+        }
+
+        private async Task AttachPoemsAsync(List<GenoTree> trees)
+        {
+            if (trees.Count == 0)
+            {
+                return;
+            }
+
+            foreach (var tree in trees)
+            {
+                tree.Poems = await _db.GenoGenerationPoems
+                    .Where(p => !p.IsDel && p.TreeID == tree.TreeID)
+                    .OrderBy(p => p.GenerationNum)
+                    .ToListAsync();
+            }
         }
     }
 }

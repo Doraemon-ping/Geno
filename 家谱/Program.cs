@@ -1,66 +1,67 @@
-using Microsoft.AspNetCore.Authentication.JwtBearer; // È·±£ÒıÓÃ
+ï»¿using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Serilog;
 using System.Text;
-using ¼ÒÆ×.DB;
-using ¼ÒÆ×.Middleware;
-using ¼ÒÆ×.Services;
-using ¼ÒÆ×.Services.Common;
-using ¼ÒÆ×.Setting;
+using å®¶è°±.DB;
+using å®¶è°±.Middleware;
+using å®¶è°±.Services;
+using å®¶è°±.Services.Common;
+using å®¶è°±.Setting;
 
-var builder = WebApplication.CreateBuilder(args);
+var appBasePath = AppContext.BaseDirectory;
+var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+{
+    Args = args,
+    ContentRootPath = appBasePath,
+    WebRootPath = Path.Combine(appBasePath, "wwwroot")
+});
 
-// ÅäÖÃ Serilog
+// é…ç½® Serilog
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Information()
-    .WriteTo.Console() // Êä³öµ½¿ØÖÆÌ¨
-    .WriteTo.File("logs/log-.txt", rollingInterval: RollingInterval.Day) // Ã¿ÌìÉú³ÉÒ»¸öĞÂÎÄ¼ş
+    .WriteTo.Console()
+    .WriteTo.File("logs/log-.txt", rollingInterval: RollingInterval.Day)
     .CreateLogger();
 
-builder.Host.UseSerilog(); // ½« Serilog ¼¯³Éµ½ ASP.NET Core
+builder.Host.UseSerilog();
 
-// 1. ´Ó appsettings.json ¶ÁÈ¡Á¬½Ó×Ö·û´®
+// 1. ä» appsettings.json è¯»å–è¿æ¥å­—ç¬¦ä¸²
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-// 2. ×¢²á DbContext ·şÎñ
+// 2. æ³¨å†Œ DbContext æœåŠ¡
 builder.Services.AddDbContext<GenealogyDbContext>(options =>
     options.UseSqlServer(connectionString));
-// Add services to the container.
+
 builder.Services.AddControllers();
-// ÔÚ builder.Build() Ö®Ç°Ìí¼Ó
 builder.Services.AddMemoryCache();
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("JwtSettings"));
 builder.Services.AddScoped<IAuthService, AuthService>();
-//builder.Services.AddScoped<IAuditService, AuditService>();
+builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 builder.Services.AddScoped<IGenoPoemService, GenoPoemService>();
 builder.Services.AddScoped<IGenoTreeService, GenoTreeService>();
+builder.Services.AddScoped<ITreePermissionService, TreePermissionService>();
 builder.Services.AddScoped<IReviewService, ReviewService>();
 builder.Services.AddScoped<IHandleTasks, HandleTasks>();
+builder.Services.AddScoped<IDatabaseSchemaInitializer, DatabaseSchemaInitializer>();
 
-// °ó¶¨ÅäÖÃ
 builder.Services.Configure<MailSettings>(builder.Configuration.GetSection("MailSettings"));
-// ×¢²á·şÎñÎªµ¥Àı»òË²Ê±
 builder.Services.AddTransient<IMailService, MailService>();
 
-// --- ²½Öè 1: ×¢²á Swagger ·şÎñ ---
-builder.Services.AddControllers(); // È·±£¿ØÖÆÆ÷ÒÑ×¢²á
-builder.Services.AddEndpointsApiExplorer(); // Ê¹ API ¿É±»·¢ÏÖ
+builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo { Title = "¼ÒÆ× API", Version = "v1" });
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "å®¶è°± API", Version = "v1" });
 
-    // 1. ¶¨Òå°²È«¶¨Òå (Security Definition)
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
-        Description = "ÇëÊäÈë JWT Token£¬¸ñÊ½Îª£ºBearer {Your_Token}",
+        Description = "è¯·è¾“å…¥ JWT Tokenï¼Œæ ¼å¼ä¸ºï¼šBearer {Your_Token}",
         Name = "Authorization",
-        In = ParameterLocation.Header, // È·±£ÔÚ Header ÖĞ
+        In = ParameterLocation.Header,
         Type = SecuritySchemeType.ApiKey,
         Scheme = "Bearer"
     });
 
-    // 2. È«¾ÖÓ¦ÓÃ°²È«ÒªÇó
     c.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
         {
@@ -68,27 +69,23 @@ builder.Services.AddSwaggerGen(c =>
             {
                 Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
             },
-            new string[] {}
+            Array.Empty<string>()
         }
     });
 });
 
-// 1. ¶¨Òå²ßÂÔ
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
     {
         policy.AllowAnyOrigin()
-              .AllowAnyHeader() // ±ØĞëÔÊĞí×Ô¶¨Òå Header
+              .AllowAnyHeader()
               .AllowAnyMethod();
     });
 });
 
-// --- ×¢²á·şÎñ²¿·Ö ---
-
 builder.Services.AddAuthentication(options =>
 {
-    // ¹Ø¼üĞŞ¸´£ºÉèÖÃÄ¬ÈÏ·½°¸Îª JwtBearer
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
     options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
 })
@@ -99,41 +96,39 @@ builder.Services.AddAuthentication(options =>
         ValidateIssuer = true,
         ValidateAudience = true,
         ValidateLifetime = true,
-        ClockSkew = TimeSpan.Zero, // ¿ÉÑ¡£º½ûÓÃÄ¬ÈÏµÄ 5 ·ÖÖÓ¹ıÆÚ¿íÏŞ
+        ClockSkew = TimeSpan.Zero,
         ValidateIssuerSigningKey = true,
-        ValidIssuer = "GenealogyApi", // ±ØĞëºÍÉÏÃæÒ»Ä£Ò»Ñù
+        ValidIssuer = "GenealogyApi",
         ValidAudience = "GenealogyApp",
-        IssuerSigningKey = new
-                        SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["JwtSettings:Secret"]!))
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["JwtSettings:Secret"]!))
     };
 });
 
 var app = builder.Build();
 
-// ¿ªÆôÈ«¾ÖÒì³£À¹½Ø
+using (var scope = app.Services.CreateScope())
+{
+    var schemaInitializer = scope.ServiceProvider.GetRequiredService<IDatabaseSchemaInitializer>();
+    await schemaInitializer.EnsureAsync();
+}
+
 app.UseMiddleware<ExceptionMiddleware>();
 
-// --- ²½Öè 2: ÅäÖÃ Swagger ÖĞ¼ä¼ş ---
-// ½¨Òé½öÔÚ¿ª·¢»·¾³ (Development) ÆôÓÃ£¬Éú²ú»·¾³½¨Òé¹Ø±ÕÒÔ±£°²È«
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "¼ÒÆ× API v1");
-        // Èç¹ûÏëÈÃ Swagger ³ÉÎªÊ×Ò³£¨·ÃÎÊ http://localhost:xxxx/ Ö±½Ó½øÈë£©£¬ÉèÎª¿Õ£º
-        // c.RoutePrefix = string.Empty;
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "å®¶è°± API v1");
     });
 }
 
-// 2. Ê¹ÓÃÖĞ¼ä¼ş (±ØĞë·ÅÔÚ UseAuthentication Ö®Ç°)
 app.UseCors("AllowAll");
-
+app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseHttpsRedirection();
 app.UseRouting();
-// Ë³Ğò±ØĞëÊÇ£ºÈÏÖ¤ -> ÊÚÈ¨
-app.UseAuthentication(); // 1. ÎÒÊÇË­£¿(½âÎö Token)
-app.UseAuthorization(); // 2. ÎÒÄÜ×öÊ²Ã´£¿(¼ì²é [Authorize])
+app.UseAuthentication();
+app.UseAuthorization();
 app.MapControllers();
 app.Run();

@@ -1,24 +1,29 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>我的族谱 - 赵氏宗亲平台</title>
-    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root {
             --primary: #8b4513;
-            --bg: #fdfaf2;
-            --paper: #fff;
+            --accent: #a0522d;
+            --gold: #d4af37;
+            --paper: #fdfaf2;
+            --glass: rgba(255, 255, 255, 0.85);
         }
+
+        * { box-sizing: border-box; }
 
         body {
             margin: 0;
-            font-family: "Noto Serif SC", serif;
-            background: var(--bg);
-            padding-top: 100px;
+            font-family: "Noto Serif SC", "KaiTi", serif;
+            background: var(--paper);
+            color: #333;
+            padding-top: 80px;
         }
 
-        /* 导航栏直接复用 index.html 的样式 */
         .navbar {
             position: fixed;
             top: 0;
@@ -28,229 +33,598 @@
             justify-content: space-between;
             align-items: center;
             padding: 0 5%;
-            background: rgba(255,255,255,0.9);
+            background: var(--glass);
             backdrop-filter: blur(10px);
-            border-bottom: 1px solid rgba(139,69,19,0.1);
+            border-bottom: 1px solid rgba(139, 69, 19, 0.1);
             z-index: 1000;
         }
 
         .logo {
-            font-size: 24px;
-            color: var(--primary);
-            text-decoration: none;
+            font-size: 28px;
             font-weight: bold;
+            color: var(--primary);
+            letter-spacing: 4px;
+            text-decoration: none;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 24px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .nav-links a,
+        .nav-links button {
+            text-decoration: none;
+            color: #555;
+            font-size: 16px;
+            background: none;
+            border: none;
+            font-family: inherit;
+            cursor: pointer;
+            padding: 0;
+            position: relative;
+        }
+
+        .nav-links a:hover,
+        .nav-links button:hover {
+            color: var(--primary);
+        }
+
+        .nav-links a.active::after {
+            content: "";
+            position: absolute;
+            bottom: -5px;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: var(--primary);
+        }
+
+        .hero {
+            height: 240px;
+            background: linear-gradient(rgba(44, 30, 22, 0.45), rgba(44, 30, 22, 0.45)), url("https://images.unsplash.com/photo-1517841905240-472988babdf9?q=80&w=1800") center/cover;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            text-align: center;
+            padding: 0 20px;
+        }
+
+        .hero h1 {
+            margin: 0 0 10px;
+            font-size: 38px;
+            letter-spacing: 6px;
+        }
+
+        .hero p {
+            margin: 0;
+            font-size: 16px;
+            opacity: 0.92;
+            max-width: 760px;
+            line-height: 1.9;
         }
 
         .container {
             max-width: 1200px;
-            margin: 0 auto;
+            margin: -40px auto 50px;
             padding: 0 20px;
         }
 
-        .page-header {
+        .panel {
+            background: white;
+            padding: 28px;
+            border-radius: 4px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.05);
+            margin-bottom: 24px;
+        }
+
+        .section-title {
+            font-size: 22px;
+            color: var(--primary);
+            border-left: 5px solid var(--primary);
+            padding-left: 15px;
+            margin-bottom: 22px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 40px;
+            gap: 12px;
         }
 
-        .page-title {
-            font-size: 32px;
-            color: var(--primary);
-            border-bottom: 3px solid var(--primary);
-            padding-bottom: 5px;
+        .stats {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            color: #777;
+            font-size: 14px;
         }
 
-        /* 现代化卡片布局 */
-        .tree-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-            gap: 30px;
+        .stats span {
+            background: #faf7f2;
+            padding: 8px 12px;
+            border-left: 3px solid var(--gold);
         }
 
-        .tree-card {
-            background: var(--paper);
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
-            transition: 0.3s;
-            position: relative;
-        }
-
-            .tree-card:hover {
-                transform: translateY(-10px);
-                box-shadow: 0 20px 40px rgba(139,69,19,0.1);
-            }
-
-        .card-body {
-            padding: 25px;
-        }
-
-        .card-tag {
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            padding: 4px 10px;
-            border-radius: 4px;
-            font-size: 12px;
-        }
-
-        .tag-public {
-            background: #e6f7ff;
-            color: #1890ff;
-        }
-
-        .tag-private {
-            background: #fff7e6;
-            color: #faad14;
-        }
-
-        .btn {
-            padding: 8px 20px;
-            border-radius: 4px;
-            cursor: pointer;
+        .action-button,
+        .ghost-button {
             border: none;
-            transition: 0.3s;
+            padding: 10px 16px;
+            border-radius: 2px;
+            cursor: pointer;
             font-family: inherit;
         }
 
-        .btn-primary {
+        .action-button {
             background: var(--primary);
             color: white;
         }
 
-        .btn-outline {
-            background: transparent;
+        .ghost-button {
+            background: white;
+            color: var(--primary);
+            border: 1px solid var(--primary);
+        }
+
+        .message {
+            min-height: 24px;
+            color: #c0392b;
+            margin-bottom: 14px;
+        }
+
+        .success { color: #2e7d32; }
+
+        .tree-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 22px;
+        }
+
+        .tree-card {
+            background: white;
+            border-radius: 4px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+            border-top: 4px solid transparent;
+            transition: 0.35s;
+            padding: 24px;
+        }
+
+        .tree-card:hover {
+            transform: translateY(-8px);
+            border-top-color: var(--primary);
+        }
+
+        .tree-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .tree-top h3 {
+            margin: 0;
+            color: var(--primary);
+            font-size: 22px;
+        }
+
+        .stack {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .tag {
+            font-size: 12px;
+            padding: 5px 10px;
+            border-radius: 2px;
+        }
+
+        .tag.public {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .tag.private {
+            background: #fff3e0;
+            color: #ef6c00;
+        }
+
+        .tag.role {
+            background: #faf7f2;
+            color: var(--primary);
+        }
+
+        .tree-meta {
+            color: #777;
+            font-size: 14px;
+            line-height: 1.8;
+            margin-bottom: 14px;
+        }
+
+        .tree-desc {
+            color: #666;
+            font-size: 14px;
+            line-height: 1.7;
+            min-height: 52px;
+            margin-bottom: 18px;
+        }
+
+        .tree-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .tree-actions a,
+        .tree-actions button {
+            text-decoration: none;
+            border: none;
+            padding: 8px 14px;
+            border-radius: 2px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        .tree-actions a,
+        .tree-actions .primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .tree-actions .secondary {
+            background: white;
             border: 1px solid var(--primary);
             color: var(--primary);
         }
 
-        /* 简单弹窗样式 */
-        #modal {
-            display: none;
+        .tree-actions .danger {
+            background: #fff5f5;
+            color: #c0392b;
+        }
+
+        .note {
+            margin-top: 14px;
+            padding: 12px;
+            background: #faf7f2;
+            color: #666;
+            line-height: 1.7;
+            font-size: 13px;
+            border-left: 3px solid var(--gold);
+        }
+
+        .empty {
+            color: #999;
+            text-align: center;
+            padding: 30px 10px;
+        }
+
+        .modal {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.6);
-            z-index: 2000;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.55);
+            display: none;
             justify-content: center;
             align-items: center;
+            z-index: 1100;
+            padding: 20px;
         }
 
-        .modal-content {
-            background: #fff;
-            width: 450px;
-            padding: 40px;
-            border-radius: 8px;
+        .modal.show { display: flex; }
+
+        .modal-card {
+            width: min(560px, 100%);
+            background: white;
+            border-radius: 4px;
+            padding: 30px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.22);
         }
 
-        input, textarea {
+        .modal-card h3 {
+            margin: 0 0 18px;
+            color: var(--primary);
+            font-size: 24px;
+        }
+
+        .field {
+            margin-bottom: 16px;
+        }
+
+        .field label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--primary);
+            font-size: 14px;
+        }
+
+        .field input,
+        .field textarea {
             width: 100%;
             padding: 12px;
-            margin: 10px 0;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            box-sizing: border-box;
+            border: 1px solid rgba(139, 69, 19, 0.18);
+            border-radius: 2px;
+            font-family: inherit;
+            background: #fffdf8;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 18px;
+        }
+
+        @media (max-width: 768px) {
+            .navbar { padding: 0 20px; height: auto; min-height: 80px; }
+            .hero h1 { font-size: 30px; }
         }
     </style>
 </head>
 <body>
     <nav class="navbar">
-        <a href="index.html" class="logo">赵氏家谱</a>
-        <div style="display:flex; gap:20px;">
-            <a href="index.html" style="text-decoration:none; color:#666">首页</a>
-            <a href="my-trees.html" style="text-decoration:none; color:var(--primary); font-weight:bold">我的族谱</a>
-            <a href="profile.html" style="text-decoration:none; color:#666">个人中心</a>
+        <a class="logo" href="index.html">赵氏家谱</a>
+        <div class="nav-links">
+            <a href="index.html">首页</a>
+            <a href="my-trees.html" class="active">我的族谱</a>
+            <a href="public.html">万姓同根</a>
+            <a href="profile.html">个人中心</a>
+            <button id="logoutBtn">退出</button>
         </div>
     </nav>
 
+    <header class="hero">
+        <h1>卷宗总览</h1>
+        <p>这里既展示你创建的家谱树，也展示你作为树管理员或修谱员参与维护的卷宗。没有直接权限的创建、修改和删除会自动转为审核任务。</p>
+    </header>
+
     <div class="container">
-        <div class="page-header">
-            <h1 class="page-title">我的私有族谱</h1>
-            <button class="btn btn-primary" onclick="openModal()">+ 开启新卷</button>
+        <div class="panel">
+            <div class="section-title">
+                <span>卷宗概览</span>
+                <button class="action-button" id="createBtn">提交新树申请</button>
+            </div>
+            <div class="stats">
+                <span>可访问卷宗：<b id="treeCount">0</b></span>
+                <span>公开卷宗：<b id="publicCount">0</b></span>
+                <span>累计字辈：<b id="poemCount">0</b></span>
+            </div>
         </div>
-        <div id="treeList" class="tree-grid">
+
+        <div class="panel">
+            <div class="section-title">卷宗列表</div>
+            <div id="message" class="message"></div>
+            <div id="treeGrid" class="tree-grid">
+                <div class="empty">正在读取卷宗列表...</div>
+            </div>
         </div>
     </div>
 
-    <div id="modal">
-        <div class="modal-content">
-            <h3 id="mTitle" style="color:var(--primary); margin-top:0">创建新家族树</h3>
-            <input type="hidden" id="treeId">
-            <input type="text" id="treeName" placeholder="族谱名称 (如：清河赵氏重修支谱)">
-            <input type="text" id="ancestorName" placeholder="始祖姓名">
-            <input type="text" id="region" placeholder="祖籍/地区">
-            <textarea id="description" placeholder="家族简述" rows="3"></textarea>
-            <div style="margin:10px 0; font-size:14px">
-                <input type="checkbox" id="isPublic" style="width:auto"> 允许全族公开查阅
+    <div class="modal" id="modal">
+        <div class="modal-card">
+            <h3 id="modalTitle">提交新建家谱树申请</h3>
+            <div class="field">
+                <label for="treeName">卷宗名称</label>
+                <input id="treeName" type="text" placeholder="例如：清河赵氏支谱">
             </div>
-            <button class="btn btn-primary" style="width:100%" onclick="saveTree()">保存卷宗</button>
-            <button class="btn btn-outline" style="width:100%; margin-top:10px" onclick="closeModal()">取消</button>
+            <div class="field">
+                <label for="ancestorName">始祖姓名</label>
+                <input id="ancestorName" type="text" placeholder="请输入始祖姓名">
+            </div>
+            <div class="field">
+                <label for="region">地区</label>
+                <input id="region" type="text" placeholder="请输入地区">
+            </div>
+            <div class="field">
+                <label for="description">卷宗说明</label>
+                <textarea id="description" rows="4" placeholder="可补充迁徙说明、修谱范围等"></textarea>
+            </div>
+            <div class="field">
+                <label><input id="isPublic" type="checkbox" style="width:auto;margin-right:8px">允许出现在公开谱库</label>
+            </div>
+            <div class="modal-actions">
+                <button class="action-button" id="saveBtn">提交</button>
+                <button class="ghost-button" id="cancelBtn">取消</button>
+            </div>
         </div>
     </div>
 
     <script>
-        const token = localStorage.getItem('token');
-        const api = axios.create({ baseURL: '/api', headers: { Authorization: `Bearer ${token}` } });
+        const token = localStorage.getItem("token");
+        const modal = document.getElementById("modal");
+        const message = document.getElementById("message");
+        let trees = [];
+        let editingId = "";
 
-        async function loadTrees() {
-            const trees = await api.get('/GenoTree/my-trees').then(r => r.data);
-            document.getElementById('treeList').innerHTML = trees.map(t => `
+        if (!token) {
+            location.href = "login.html?redirect=my-trees.html";
+        }
+
+        function authHeaders() {
+            return {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json"
+            };
+        }
+
+        async function requestJson(url, options = {}) {
+            const response = await fetch(url, options);
+            const contentType = response.headers.get("content-type") || "";
+            const payload = contentType.includes("application/json") ? await response.json() : await response.text();
+            if (!response.ok) {
+                const errorMessage = typeof payload === "string" ? payload : payload?.message;
+                throw new Error(errorMessage || "请求失败");
+            }
+            return payload;
+        }
+
+        function setMessage(text, success = false) {
+            message.textContent = text || "";
+            message.className = success ? "message success" : "message";
+        }
+
+        function resetForm() {
+            editingId = "";
+            document.getElementById("modalTitle").textContent = "提交新建家谱树申请";
+            document.getElementById("treeName").value = "";
+            document.getElementById("ancestorName").value = "";
+            document.getElementById("region").value = "";
+            document.getElementById("description").value = "";
+            document.getElementById("isPublic").checked = false;
+        }
+
+        function updateStats() {
+            document.getElementById("treeCount").textContent = trees.length;
+            document.getElementById("publicCount").textContent = trees.filter(tree => tree.isPublic).length;
+            document.getElementById("poemCount").textContent = trees.reduce((sum, tree) => sum + (tree.poems?.length || 0), 0);
+        }
+
+        function workflowMessage(result, fallback) {
+            return result?.data?.message || result?.message || fallback;
+        }
+
+        function renderTrees() {
+            updateStats();
+            const grid = document.getElementById("treeGrid");
+            if (!trees.length) {
+                grid.innerHTML = '<div class="empty">你还没有可访问的卷宗，点击上方按钮先提交一份新树申请。</div>';
+                return;
+            }
+
+            grid.innerHTML = trees.map(tree => {
+                const access = tree.access || {};
+                const canEdit = Boolean(access.canEdit);
+                const roleName = access.roleName || "访客";
+                return `
                     <div class="tree-card">
-                        <span class="card-tag ${t.isPublic ? 'tag-public' : 'tag-private'}">${t.isPublic ? '公开' : '私有'}</span>
-                        <div class="card-body">
-                            <h3 style="color:var(--primary); margin:0 0 15px 0">${t.treeName}</h3>
-                            <p style="font-size:14px; color:#666">始祖：${t.ancestorName || '不详'}</p>
-                            <p style="font-size:14px; color:#666">地区：${t.region || '未知'}</p>
-                            <div style="margin-top:20px; display:flex; gap:10px">
-                                <button class="btn btn-primary" onclick="location.href='tree-detail.html?id=${t.treeID}'">管理字辈</button>
-                                <button class="btn btn-outline" onclick="editTree('${t.treeID}')">修订</button>
-                                <button class="btn" style="color:red" onclick="deleteTree('${t.treeID}')">删除</button>
+                        <div class="tree-top">
+                            <h3>${tree.treeName}</h3>
+                            <div class="stack">
+                                <span class="tag ${tree.isPublic ? "public" : "private"}">${tree.isPublic ? "公开" : "私有"}</span>
+                                <span class="tag role">${roleName}</span>
                             </div>
                         </div>
+                        <div class="tree-meta">
+                            始祖：${tree.ancestorName || "未载"}<br>
+                            地区：${tree.region || "未标注"}<br>
+                            字辈数：${tree.poems?.length || 0}
+                        </div>
+                        <div class="tree-desc">${tree.description || "当前卷宗尚未补充说明。"}</div>
+                        <div class="tree-actions">
+                            <a href="tree-detail.html?id=${tree.treeID}">进入卷宗</a>
+                            ${canEdit ? `<button class="secondary" onclick="editTree('${tree.treeID}')">修改</button>` : ""}
+                            ${canEdit ? `<button class="danger" onclick="deleteTree('${tree.treeID}')">删除</button>` : ""}
+                        </div>
+                        <div class="note">
+                            ${canEdit ? "你拥有这棵树的直接维护权限，修改会立即生效。" : "你当前没有直接维护权限，相关操作会转为审核申请。"}
+                        </div>
                     </div>
-                `).join('');
+                `;
+            }).join("");
         }
 
-        async function saveTree() {
-            const id = document.getElementById('treeId').value;
-            const dto = {
-                treeName: document.getElementById('treeName').value,
-                ancestorName: document.getElementById('ancestorName').value,
-                region: document.getElementById('region').value,
-                description: document.getElementById('description').value,
-                isPublic: document.getElementById('isPublic').checked
-            };
-            if (id) await api.put(`/GenoTree/Update/${id}`, dto);
-            else await api.post('/GenoTree/Add', dto);
-            closeModal(); loadTrees();
-        }
-
-        async function editTree(id) {
-            const t = await api.get(`/GenoTree/Get/${id}`).then(r => r.data);
-            document.getElementById('treeId').value = t.treeID;
-            document.getElementById('treeName').value = t.treeName;
-            document.getElementById('ancestorName').value = t.ancestorName;
-            document.getElementById('region').value = t.region;
-            document.getElementById('description').value = t.description;
-            document.getElementById('isPublic').checked = t.isPublic;
-            document.getElementById('mTitle').innerText = "修订家族信息";
-            openModal();
-        }
-
-        async function deleteTree(id) {
-            if (confirm("确定要焚毁此卷宗吗？此操作不可逆。")) {
-                await api.delete(`/GenoTree/Del/${id}`);
-                loadTrees();
+        async function loadTrees() {
+            try {
+                trees = await requestJson("/api/GenoTree/my-trees", {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                renderTrees();
+            } catch (error) {
+                document.getElementById("treeGrid").innerHTML = `<div class="empty">${error.message}</div>`;
             }
         }
 
-        function openModal() { document.getElementById('modal').style.display = 'flex'; }
-        function closeModal() { document.getElementById('modal').style.display = 'none'; }
+        function openModal() {
+            modal.classList.add("show");
+        }
+
+        function closeModal() {
+            modal.classList.remove("show");
+            resetForm();
+        }
+
+        function editTree(id) {
+            const tree = trees.find(item => item.treeID === id);
+            if (!tree) return;
+            editingId = id;
+            document.getElementById("modalTitle").textContent = "修改家谱树";
+            document.getElementById("treeName").value = tree.treeName || "";
+            document.getElementById("ancestorName").value = tree.ancestorName || "";
+            document.getElementById("region").value = tree.region || "";
+            document.getElementById("description").value = tree.description || "";
+            document.getElementById("isPublic").checked = Boolean(tree.isPublic);
+            openModal();
+        }
+
+        async function saveTree() {
+            setMessage("");
+            const payload = {
+                treeName: document.getElementById("treeName").value.trim(),
+                ancestorName: document.getElementById("ancestorName").value.trim(),
+                region: document.getElementById("region").value.trim(),
+                description: document.getElementById("description").value.trim(),
+                isPublic: document.getElementById("isPublic").checked
+            };
+
+            if (!payload.treeName) {
+                setMessage("请先填写卷宗名称。");
+                return;
+            }
+
+            try {
+                let result;
+                if (editingId) {
+                    result = await requestJson(`/api/GenoTree/Update/${editingId}`, {
+                        method: "PUT",
+                        headers: authHeaders(),
+                        body: JSON.stringify(payload)
+                    });
+                } else {
+                    result = await requestJson("/api/GenoTree/Add", {
+                        method: "POST",
+                        headers: authHeaders(),
+                        body: JSON.stringify(payload)
+                    });
+                }
+
+                setMessage(workflowMessage(result, "操作成功"), true);
+                closeModal();
+                loadTrees();
+            } catch (error) {
+                setMessage(error.message);
+            }
+        }
+
+        async function deleteTree(id) {
+            if (!confirm("确定删除此卷宗吗？")) return;
+            try {
+                const result = await requestJson(`/api/GenoTree/Del/${id}`, {
+                    method: "DELETE",
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                setMessage(workflowMessage(result, "操作成功"), true);
+                loadTrees();
+            } catch (error) {
+                setMessage(error.message);
+            }
+        }
+
+        document.getElementById("createBtn").addEventListener("click", openModal);
+        document.getElementById("cancelBtn").addEventListener("click", closeModal);
+        document.getElementById("saveBtn").addEventListener("click", saveTree);
+        document.getElementById("logoutBtn").addEventListener("click", () => {
+            localStorage.removeItem("token");
+            location.href = "index.html";
+        });
+        modal.addEventListener("click", event => {
+            if (event.target === modal) closeModal();
+        });
 
         loadTrees();
+        window.editTree = editTree;
+        window.deleteTree = deleteTree;
     </script>
 </body>
 </html>

@@ -27,4 +27,6 @@ public class SubmitReviewRequest
     /// </summary>
     [Required(ErrorMessage = "变更数据不能为空")]
     public string ChangeData { get; set; } = null!;
+
+    public bool ForceCreateTask { get; set; }
 }

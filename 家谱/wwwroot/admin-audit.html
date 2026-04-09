@@ -1,225 +1,469 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
-
 <head>
     <meta charset="UTF-8">
-    <title>宗务审核中心 - 赵氏家谱</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>宗务审核 - 赵氏家谱平台</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
             --primary: #8b4513;
-            --bg: #fdfaf2;
-            --accent: #e0d5c1;
+            --accent: #a0522d;
+            --gold: #d4af37;
+            --paper: #fdfaf2;
+            --glass: rgba(255, 255, 255, 0.85);
         }
 
+        * { box-sizing: border-box; }
+
         body {
-            background: var(--bg);
-            font-family: "Microsoft YaHei", serif;
-            padding: 20px;
+            margin: 0;
+            font-family: "Noto Serif SC", "KaiTi", serif;
+            background: var(--paper);
+            color: #333;
+            padding-top: 80px;
+        }
+
+        .navbar {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            height: 80px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 5%;
+            background: var(--glass);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(139, 69, 19, 0.1);
+            z-index: 1000;
+        }
+
+        .logo {
+            font-size: 28px;
+            font-weight: bold;
+            color: var(--primary);
+            letter-spacing: 4px;
+            text-decoration: none;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 24px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .nav-links a,
+        .nav-links button {
+            text-decoration: none;
+            color: #555;
+            font-size: 16px;
+            background: none;
+            border: none;
+            font-family: inherit;
+            cursor: pointer;
+            padding: 0;
+        }
+
+        .nav-links a:hover,
+        .nav-links button:hover {
+            color: var(--primary);
+        }
+
+        .hero {
+            height: 250px;
+            background:
+                linear-gradient(rgba(44, 30, 22, 0.46), rgba(44, 30, 22, 0.46)),
+                url("https://images.unsplash.com/photo-1455390582262-044cdead277a?q=80&w=1800") center/cover;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            text-align: center;
+            padding: 0 20px;
+        }
+
+        .hero h1 {
+            margin: 0 0 10px;
+            font-size: 38px;
+            letter-spacing: 6px;
+        }
+
+        .hero p {
+            margin: 0;
+            max-width: 840px;
+            line-height: 1.9;
+            opacity: 0.92;
         }
 
         .container {
-            max-width: 1000px;
-            margin: 0 auto;
-            background: #fff;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            max-width: 1160px;
+            margin: -40px auto 50px;
+            padding: 0 20px;
         }
 
-        h2 {
+        .panel {
+            background: white;
+            padding: 28px;
+            border-radius: 4px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.05);
+            margin-bottom: 24px;
+        }
+
+        .section-title {
+            font-size: 22px;
             color: var(--primary);
-            border-bottom: 2px solid var(--primary);
-            padding-bottom: 10px;
+            border-left: 5px solid var(--primary);
+            padding-left: 15px;
+            margin-bottom: 22px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
         }
 
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 18px;
         }
 
-        th {
-            background: var(--accent);
+        .stat-card {
+            background: #faf7f2;
+            border-left: 3px solid var(--gold);
+            padding: 16px;
+            color: #666;
+        }
+
+        .stat-card strong {
+            display: block;
+            font-size: 28px;
             color: var(--primary);
-            padding: 12px;
-            text-align: left;
+            margin-bottom: 6px;
         }
 
-        td {
-            padding: 12px;
-            border-bottom: 1px solid #eee;
-            font-size: 14px;
+        .task-list {
+            display: grid;
+            gap: 18px;
         }
 
-        tr:hover {
-            background: #f9f6f0;
+        .task-card {
+            border: 1px solid rgba(139, 69, 19, 0.16);
+            border-radius: 4px;
+            background: white;
+            padding: 18px;
+        }
+
+        .task-top {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+
+        .task-top strong {
+            color: var(--primary);
+            font-size: 20px;
         }
 
         .badge {
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 12px;
-        }
-
-        .badge-1 {
-            background: #e3f2fd;
-            color: #1976d2;
-        }
-
-        /* 认领 */
-        .badge-2 {
-            background: #f3e5f5;
-            color: #7b1fa2;
-        }
-
-        /* 权限 */
-
-        .btn-group button {
-            margin-right: 5px;
             padding: 6px 12px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
+            border-radius: 999px;
+            font-size: 12px;
+            line-height: 1;
+            background: rgba(212, 175, 55, 0.18);
+            color: var(--primary);
+            white-space: nowrap;
         }
 
-        .btn-approve {
-            background: #2e7d32;
-            color: white;
+        .meta,
+        .detail {
+            color: #666;
+            line-height: 1.8;
         }
 
-        .btn-reject {
-            background: #d32f2f;
-            color: white;
+        .meta {
+            display: grid;
+            gap: 6px;
+            margin-bottom: 14px;
         }
 
-        /* 弹窗样式 */
-        #modal {
-            display: none;
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: white;
-            padding: 20px;
-            border: 2px solid var(--primary);
-            z-index: 100;
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+        .summary-box {
+            margin-bottom: 14px;
+            padding: 12px;
+            background: #faf7f2;
+            border-left: 3px solid var(--gold);
         }
 
-        .mask {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
+        .summary-box strong {
+            display: block;
+            color: var(--primary);
+            margin-bottom: 6px;
+        }
+
+        .detail pre {
+            margin: 10px 0 0;
+            padding: 12px;
+            background: #fffdf8;
+            border: 1px solid rgba(139, 69, 19, 0.12);
+            overflow: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+            font: 12px/1.7 Consolas, monospace;
+        }
+
+        .field {
+            margin-top: 14px;
+        }
+
+        .field label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--primary);
+            font-size: 14px;
+        }
+
+        .field textarea {
             width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 99;
+            padding: 12px;
+            border: 1px solid rgba(139, 69, 19, 0.18);
+            border-radius: 2px;
+            font-family: inherit;
+            background: #fffdf8;
+            min-height: 88px;
+            resize: vertical;
+        }
+
+        .button-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 12px;
+        }
+
+        .action-button,
+        .ghost-button,
+        .danger-button {
+            border: none;
+            padding: 10px 16px;
+            border-radius: 2px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        .action-button {
+            background: var(--primary);
+            color: white;
+        }
+
+        .ghost-button {
+            background: white;
+            color: var(--primary);
+            border: 1px solid var(--primary);
+        }
+
+        .danger-button {
+            background: #fff5f5;
+            color: #c0392b;
+        }
+
+        .empty,
+        .error {
+            padding: 28px 16px;
+            text-align: center;
+            color: #888;
+        }
+
+        .error {
+            color: #c0392b;
+        }
+
+        @media (max-width: 768px) {
+            .navbar { padding: 0 20px; height: auto; min-height: 80px; }
+            .hero h1 { font-size: 30px; }
+            .stats { grid-template-columns: 1fr; }
+            .task-top { flex-direction: column; }
         }
     </style>
 </head>
-
 <body>
-
-    <div class="container">
-        <h2>待办宗务审核</h2>
-        <table id="auditTable">
-            <thead>
-                <tr>
-                    <th>申请人</th>
-                    <th>类别</th>
-                    <th>申请理由</th>
-                    <th>提交时间</th>
-                    <th>操作</th>
-                </tr>
-            </thead>
-            <tbody id="auditList">
-            </tbody>
-        </table>
-    </div>
-
-    <div class="mask" id="mask"></div>
-    <div id="modal">
-        <h3 id="modalTitle">处理申请</h3>
-        <textarea id="auditRemark" rows="4" style="width:100%" placeholder="请输入审批备注..."></textarea>
-        <div style="margin-top:15px; text-align:right;">
-            <button onclick="closeModal()">取消</button>
-            <button id="confirmBtn" style="background:var(--primary); color:white; padding:5px 15px;">确认提交</button>
+    <nav class="navbar">
+        <a class="logo" href="index.html">赵氏家谱</a>
+        <div class="nav-links">
+            <a href="index.html">首页</a>
+            <a href="profile.html">个人中心</a>
+            <a href="my-trees.html">我的族谱</a>
+            <button id="logoutButton">退出</button>
         </div>
-    </div>
+    </nav>
+
+    <header class="hero">
+        <h1>宗务审核</h1>
+        <p>这里展示当前账号可处理的待审核任务。系统级提权由超级管理员处理，树相关权限和内容变更则由对应树的管理员或修谱员处理。</p>
+    </header>
+
+    <main class="container">
+        <section class="panel">
+            <div class="section-title">待办概览</div>
+            <div class="stats">
+                <div class="stat-card">
+                    <strong id="pendingCount">0</strong>
+                    <span>可处理待办</span>
+                </div>
+                <div class="stat-card">
+                    <strong id="applyCount">0</strong>
+                    <span>权限申请</span>
+                </div>
+                <div class="stat-card">
+                    <strong id="contentCount">0</strong>
+                    <span>树与字辈变更</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel">
+            <div class="section-title">待办列表</div>
+            <div id="taskList" class="task-list">
+                <div class="empty">正在读取待办任务...</div>
+            </div>
+        </section>
+    </main>
 
     <script>
-        const token = localStorage.getItem('token');
-        let currentId = null;
-        let currentAction = null;
+        const token = localStorage.getItem("token");
+        const taskList = document.getElementById("taskList");
 
-        window.onload = loadAudits;
-
-        async function loadAudits() {
-            const res = await fetch('/api/audit/pending-list', {
-                headers: { 'Authorization': 'Bearer ' + token }
-            });
-            if (!res.ok) { alert("权限不足或登录过期"); return; }
-
-            const list = await res.json();
-            const tbody = document.getElementById('auditList');
-            tbody.innerHTML = list.map(item => `
-            <tr>
-                <td>${item.applicantId}</td>
-                <td><span class="badge badge-${item.category}">${getCategoryName(item.category)}</span></td>
-                <td>${item.reason || '无'}</td>
-                <td>${new Date(item.createdAt).toLocaleString()}</td>
-                <td class="btn-group">
-                    <button class="btn-approve" onclick="openModal('${item.id}', 1)">通过</button>
-                    <button class="btn-reject" onclick="openModal('${item.id}', 2)">驳回</button>
-                </td>
-            </tr>
-        `).join('');
+        if (!token) {
+            location.href = "login.html?redirect=" + encodeURIComponent("admin-audit.html");
         }
 
-        function getCategoryName(cat) {
-            return cat === 1 ? "身份认领" : cat === 2 ? "权限晋升" : "资料修改";
-        }
+        async function requestJson(url, options = {}) {
+            const response = await fetch(url, options);
+            const contentType = response.headers.get("content-type") || "";
+            const payload = contentType.includes("application/json") ? await response.json() : await response.text();
 
-        function openModal(id, action) {
-            currentId = id;
-            currentAction = action;
-            document.getElementById('modalTitle').innerText = action === 1 ? "确认核准通过？" : "确认驳回申请？";
-            document.getElementById('mask').style.display = 'block';
-            document.getElementById('modal').style.display = 'block';
-        }
-
-        function closeModal() {
-            document.getElementById('mask').style.display = 'none';
-            document.getElementById('modal').style.display = 'none';
-            document.getElementById('auditRemark').value = "";
-        }
-
-        document.getElementById('confirmBtn').onclick = async () => {
-            const remark = document.getElementById('auditRemark').value;
-            const res = await fetch('/api/audit/handle', {
-                method: 'POST',
-                headers: {
-                    'Authorization': 'Bearer ' + token,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    requestId: currentId,
-                    action: currentAction,
-                    auditRemark: remark
-                })
-            });
-
-            if (res.ok) {
-                alert("处理成功！管理员已收到邮件通知。");
-                closeModal();
-                loadAudits();
-            } else {
-                alert("操作失败");
+            if (!response.ok) {
+                const messageText = typeof payload === "string" ? payload : payload?.message;
+                throw new Error(messageText || "请求失败");
             }
-        };
+
+            return payload;
+        }
+
+        function getBadgeText(status) {
+            return status || "未知状态";
+        }
+
+        function prettyJson(value) {
+            if (value == null) return "无";
+            if (typeof value === "string") {
+                try {
+                    return JSON.stringify(JSON.parse(value), null, 2);
+                } catch {
+                    return value;
+                }
+            }
+            return JSON.stringify(value, null, 2);
+        }
+
+        function renderSummaryBlock(title, data) {
+            if (!data) return "";
+            return `
+                <div class="summary-box">
+                    <strong>${title}</strong>
+                    <pre>${prettyJson(data)}</pre>
+                </div>
+            `;
+        }
+
+        function renderTask(task) {
+            return `
+                <article class="task-card">
+                    <div class="task-top">
+                        <strong>${task.actionName || "未命名任务"}</strong>
+                        <span class="badge">${getBadgeText(task.status)}</span>
+                    </div>
+                    <div class="meta">
+                        <span>提交人：${task.submitterName || "未知"}</span>
+                        <span>提交时间：${task.createTime || "未记录"}</span>
+                        <span>申请理由：${task.reason || "未填写"}</span>
+                    </div>
+                    <div class="detail">
+                        ${renderSummaryBlock("目标树", task.treeSummary)}
+                        ${renderSummaryBlock("目标对象", task.targetSummary)}
+                        <div class="summary-box">
+                            <strong>变更内容</strong>
+                            <pre>${prettyJson(task.changeData)}</pre>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label for="note-${task.taskId}">审核备注</label>
+                        <textarea id="note-${task.taskId}" placeholder="可填写通过说明或驳回原因"></textarea>
+                    </div>
+                    <div class="button-row">
+                        <button class="action-button" onclick="processTask('${task.taskId}', 1)">通过并执行</button>
+                        <button class="danger-button" onclick="processTask('${task.taskId}', 2)">驳回</button>
+                    </div>
+                </article>
+            `;
+        }
+
+        function updateStats(tasks) {
+            document.getElementById("pendingCount").textContent = tasks.length;
+            document.getElementById("applyCount").textContent = tasks.filter(item =>
+                item.actionCode === "ApplyAdmin" || item.actionCode === "Tree.ApplyRole"
+            ).length;
+            document.getElementById("contentCount").textContent = tasks.filter(item =>
+                item.actionCode !== "ApplyAdmin" && item.actionCode !== "Tree.ApplyRole"
+            ).length;
+        }
+
+        async function loadTasks() {
+            const result = await requestJson("/api/Task/get-all", {
+                method: "POST",
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const tasks = Array.isArray(result.data) ? result.data : [];
+            updateStats(tasks);
+
+            if (!tasks.length) {
+                taskList.innerHTML = '<div class="empty">当前没有你可处理的待审核任务。</div>';
+                return;
+            }
+
+            taskList.innerHTML = tasks.map(renderTask).join("");
+        }
+
+        async function processTask(taskId, action) {
+            const notes = document.getElementById(`note-${taskId}`)?.value?.trim() || "";
+            try {
+                await requestJson("/api/Task/process", {
+                    method: "POST",
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ taskId, action, notes })
+                });
+                await loadTasks();
+            } catch (error) {
+                alert(error.message);
+            }
+        }
+
+        document.getElementById("logoutButton").addEventListener("click", () => {
+            localStorage.removeItem("token");
+            location.href = "index.html";
+        });
+
+        loadTasks().catch(error => {
+            taskList.innerHTML = `<div class="error">${error.message}</div>`;
+        });
+
+        window.processTask = processTask;
     </script>
-
 </body>
-
 </html>

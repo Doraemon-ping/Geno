@@ -1,251 +1,432 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>申请入谱 - 赵氏家谱平台</title>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-        /* 保持之前的古风现代化 CSS 样式不变 */
         :root {
             --primary: #8b4513;
-            --bg: #fdfaf2;
-            --glass: rgba(255, 255, 255, 0.9);
+            --accent: #a0522d;
+            --gold: #d4af37;
+            --paper: #fdfaf2;
+            --glass: rgba(255, 255, 255, 0.85);
         }
 
-        * {
-            box-sizing: border-box;
-        }
+        * { box-sizing: border-box; }
 
         body {
             margin: 0;
-            height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-family: 'Noto Serif SC', serif;
-            background: url('https://images.unsplash.com/photo-1578330132821-4912f71120c4?q=80&w=2000') center/cover;
+            font-family: "Noto Serif SC", "KaiTi", serif;
+            background: var(--paper);
+            color: #333;
+            padding-top: 80px;
         }
 
-        .overlay {
+        .navbar {
             position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.4);
-            z-index: 1;
-        }
-
-        .card {
-            position: relative;
-            z-index: 10;
-            width: 440px;
-            padding: 45px;
+            top: 0;
+            width: 100%;
+            height: 80px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 5%;
             background: var(--glass);
             backdrop-filter: blur(10px);
-            border-radius: 4px;
-            box-shadow: 0 25px 50px rgba(0,0,0,0.3);
-            border: 1px solid rgba(255,255,255,0.3);
+            border-bottom: 1px solid rgba(139, 69, 19, 0.1);
+            z-index: 1000;
         }
 
-        h2 {
-            text-align: center;
+        .logo {
+            font-size: 28px;
+            font-weight: bold;
             color: var(--primary);
-            letter-spacing: 6px;
-            margin-bottom: 30px;
+            letter-spacing: 4px;
+            text-decoration: none;
         }
 
-        .form-group {
+        .nav-links {
+            display: flex;
+            gap: 26px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .nav-links a {
+            text-decoration: none;
+            color: #555;
+            font-size: 16px;
+        }
+
+        .nav-links a:hover {
+            color: var(--primary);
+        }
+
+        .hero {
+            height: 270px;
+            background:
+                linear-gradient(rgba(44, 30, 22, 0.48), rgba(44, 30, 22, 0.48)),
+                url("https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1800") center/cover;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            text-align: center;
+            padding: 0 20px;
+        }
+
+        .hero h1 {
+            margin: 0 0 12px;
+            font-size: 40px;
+            letter-spacing: 8px;
+        }
+
+        .hero p {
+            margin: 0;
+            max-width: 780px;
+            line-height: 1.9;
+            opacity: 0.92;
+        }
+
+        .container {
+            max-width: 1160px;
+            margin: -46px auto 60px;
+            padding: 0 20px;
+            display: grid;
+            grid-template-columns: 0.92fr 1.08fr;
+            gap: 24px;
+        }
+
+        .panel {
+            background: white;
+            padding: 30px;
+            border-radius: 4px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.05);
+        }
+
+        .section-title {
+            font-size: 24px;
+            color: var(--primary);
+            border-left: 5px solid var(--primary);
+            padding-left: 15px;
+            margin-bottom: 20px;
+        }
+
+        .intro-list {
+            display: grid;
+            gap: 16px;
+        }
+
+        .intro-card {
+            background: #faf7f2;
+            border-left: 3px solid var(--gold);
+            padding: 16px;
+            line-height: 1.9;
+            color: #666;
+        }
+
+        .intro-card strong {
+            display: block;
+            color: var(--primary);
+            margin-bottom: 6px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 16px;
+        }
+
+        .field {
             margin-bottom: 18px;
         }
 
-            .form-group label {
-                display: block;
-                font-size: 12px;
-                color: #888;
-                margin-bottom: 6px;
-                font-weight: bold;
-            }
-
-        input {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid rgba(139,69,19,0.2);
-            border-radius: 2px;
-            outline: none;
-            background: rgba(255,255,255,0.7);
-            transition: 0.3s;
+        .field.full {
+            grid-column: 1 / -1;
         }
 
-            input:focus {
-                border-color: var(--primary);
-                background: #fff;
-            }
+        .field label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--primary);
+        }
 
-        .code-wrap {
-            display: flex;
+        .field input {
+            width: 100%;
+            padding: 13px 14px;
+            border: 1px solid rgba(139, 69, 19, 0.18);
+            border-radius: 2px;
+            font-family: inherit;
+            font-size: 15px;
+            background: #fffdf8;
+        }
+
+        .field input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(160, 82, 45, 0.08);
+        }
+
+        .code-row {
+            display: grid;
+            grid-template-columns: 1fr auto;
             gap: 10px;
         }
 
-        .btn-code {
-            padding: 0 15px;
-            background: transparent;
-            border: 1px solid var(--primary);
-            color: var(--primary);
+        .message {
+            min-height: 24px;
+            margin-bottom: 14px;
+            color: #c0392b;
+        }
+
+        .success {
+            color: #2e7d32;
+        }
+
+        .action-button,
+        .ghost-button {
+            border: none;
+            padding: 12px 18px;
+            border-radius: 2px;
             cursor: pointer;
-            font-size: 12px;
+            font-family: inherit;
+            font-size: 15px;
+        }
+
+        .action-button {
+            width: 100%;
+            background: var(--primary);
+            color: white;
+        }
+
+        .ghost-button {
+            background: white;
+            color: var(--primary);
+            border: 1px solid var(--primary);
             white-space: nowrap;
         }
 
-            .btn-code:disabled {
-                color: #ccc;
-                border-color: #ccc;
-            }
-
-        .btn-reg {
-            width: 100%;
-            padding: 15px;
-            background: var(--primary);
-            color: white;
-            border: none;
-            cursor: pointer;
-            font-size: 16px;
-            letter-spacing: 8px;
-            font-weight: bold;
-            margin-top: 10px;
-            transition: 0.3s;
+        .footer-links {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 18px;
         }
 
-        #msg-box {
-            padding: 10px;
-            font-size: 13px;
-            margin-bottom: 15px;
-            border-radius: 2px;
-            display: none;
-            text-align: center;
+        .link-button {
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        @media (max-width: 900px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 700px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .code-row {
+                grid-template-columns: 1fr;
+            }
+
+            .hero h1 {
+                font-size: 32px;
+                letter-spacing: 4px;
+            }
         }
     </style>
 </head>
 <body>
-
-    <div class="overlay"></div>
-    <div class="card">
-        <h2>登名入谱</h2>
-        <div id="msg-box"></div>
-
-        <form id="regForm" onsubmit="handleRegister(event)">
-            <div class="form-group">
-                <label>宗亲名号 (用户名)</label>
-                <input type="text" id="username" placeholder="建议使用真实姓名或雅号" required>
-            </div>
-
-            <div class="form-group">
-                <label>联络邮箱</label>
-                <input type="email" id="email" placeholder="用于身份核验" required>
-            </div>
-
-            <div class="form-group">
-                <label>身份验证码</label>
-                <div class="code-wrap">
-                    <input type="text" id="code" placeholder="邮件验证码" required>
-                    <button type="button" class="btn-code" id="sendBtn" onclick="sendCode()">获取验证码</button>
-                </div>
-            </div>
-
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                <div class="form-group">
-                    <label>入门凭证 (密码)</label>
-                    <input type="password" id="password" required>
-                </div>
-                <div class="form-group">
-                    <label>确认凭证</label>
-                    <input type="password" id="confirmPassword" required>
-                </div>
-            </div>
-
-            <div class="form-group">
-                <label>联络手机 (可选)</label>
-                <input type="text" id="phone" placeholder="选填">
-            </div>
-
-            <button type="submit" class="btn-reg">提交申请</button>
-        </form>
-
-        <div style="margin-top: 25px; text-align: center; font-size: 13px;">
-            已有功名？<a href="login.html" style="color: var(--primary); font-weight: bold; text-decoration: none;">直接登录</a>
+    <nav class="navbar">
+        <a class="logo" href="index.html">赵氏家谱</a>
+        <div class="nav-links">
+            <a href="index.html">首页</a>
+            <a href="public.html">万姓同根</a>
+            <a href="login.html">登录</a>
+            <a href="forget-password.html">找回密码</a>
         </div>
-    </div>
+    </nav>
+
+    <header class="hero">
+        <h1>申请入谱</h1>
+        <p>这一步会直接对接当前后端的验证码与注册接口。先发送邮箱验证码，再按系统需要的参数格式提交，就能完成账号申请。</p>
+    </header>
+
+    <main class="container">
+        <section class="panel">
+            <div class="section-title">办理说明</div>
+            <div class="intro-list">
+                <div class="intro-card">
+                    <strong>步骤一：发送验证码</strong>
+                    调用 `/api/Account/send-code`，以邮箱地址作为请求体发送验证码。
+                </div>
+                <div class="intro-card">
+                    <strong>步骤二：提交注册资料</strong>
+                    按后端当前要求使用 `JSON Body + ?code=` 的形式提交账号信息。
+                </div>
+                <div class="intro-card">
+                    <strong>步骤三：返回登录页</strong>
+                    注册完成后会自动跳转到登录页，继续进入你的谱务页面。
+                </div>
+            </div>
+        </section>
+
+        <section class="panel">
+            <div class="section-title">填写信息</div>
+            <form id="registerForm">
+                <div class="grid">
+                    <div class="field">
+                        <label for="username">用户名</label>
+                        <input id="username" type="text" placeholder="请输入用户名" required>
+                    </div>
+                    <div class="field">
+                        <label for="phone">手机号</label>
+                        <input id="phone" type="text" placeholder="请输入 10-15 位手机号" required>
+                    </div>
+                    <div class="field full">
+                        <label for="email">邮箱</label>
+                        <input id="email" type="email" placeholder="请输入邮箱" required>
+                    </div>
+                    <div class="field full">
+                        <label for="code">邮箱验证码</label>
+                        <div class="code-row">
+                            <input id="code" type="text" placeholder="请输入验证码" required>
+                            <button class="ghost-button" type="button" id="sendCodeButton">发送验证码</button>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label for="password">密码</label>
+                        <input id="password" type="password" placeholder="请输入密码" required>
+                    </div>
+                    <div class="field">
+                        <label for="confirmPassword">确认密码</label>
+                        <input id="confirmPassword" type="password" placeholder="请再次输入密码" required>
+                    </div>
+                </div>
+                <div class="message" id="message"></div>
+                <button class="action-button" id="submitButton" type="submit">提交注册</button>
+            </form>
+            <div class="footer-links">
+                <a class="ghost-button link-button" href="login.html">已有账号，去登录</a>
+                <a class="ghost-button link-button" href="index.html">返回首页</a>
+            </div>
+        </section>
+    </main>
 
     <script>
-        const api = axios.create({ baseURL: '/api/Account' });
+        const form = document.getElementById("registerForm");
+        const message = document.getElementById("message");
+        const sendCodeButton = document.getElementById("sendCodeButton");
+        const submitButton = document.getElementById("submitButton");
 
-        // 发送验证码 (FromBody 字符串形式)
+        async function requestJson(url, options = {}) {
+            const response = await fetch(url, options);
+            const contentType = response.headers.get("content-type") || "";
+            const payload = contentType.includes("application/json") ? await response.json() : await response.text();
+
+            if (!response.ok) {
+                const messageText = typeof payload === "string" ? payload : payload?.message;
+                throw new Error(messageText || "请求失败");
+            }
+
+            return payload;
+        }
+
+        function setMessage(text, type = "") {
+            message.textContent = text || "";
+            message.className = type ? `message ${type}` : "message";
+        }
+
         async function sendCode() {
-            const email = document.getElementById('email').value;
-            if (!email) return showMsg("请先填写邮箱", true);
+            setMessage("");
+            const email = document.getElementById("email").value.trim();
 
-            const sendBtn = document.getElementById('sendBtn');
+            if (!email) {
+                setMessage("请先填写邮箱。");
+                return;
+            }
+
             try {
-                await api.post('/send-code', `"${email}"`, {
-                    headers: { 'Content-Type': 'application/json' }
+                sendCodeButton.disabled = true;
+                await requestJson("/api/Account/send-code", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(email)
                 });
-                showMsg("验证码已发出，请查收邮件", false);
+                setMessage("验证码已发送，请查收邮箱。", "success");
 
-                let count = 60;
-                sendBtn.disabled = true;
+                let remaining = 60;
+                sendCodeButton.textContent = `${remaining}s 后重发`;
                 const timer = setInterval(() => {
-                    sendBtn.innerText = `${count--}s`;
-                    if (count < 0) {
+                    remaining -= 1;
+                    if (remaining <= 0) {
                         clearInterval(timer);
-                        sendBtn.disabled = false;
-                        sendBtn.innerText = "重新获取";
+                        sendCodeButton.disabled = false;
+                        sendCodeButton.textContent = "发送验证码";
+                        return;
                     }
+                    sendCodeButton.textContent = `${remaining}s 后重发`;
                 }, 1000);
-            } catch (e) {
-                showMsg("发送失败，请检查邮箱地址", true);
+            } catch (error) {
+                sendCodeButton.disabled = false;
+                sendCodeButton.textContent = "发送验证码";
+                setMessage(error.message);
             }
         }
 
-        // 注册提交: 混合 Body 和 Query 参数
-        async function handleRegister(event) {
+        form.addEventListener("submit", async event => {
             event.preventDefault();
+            setMessage("");
 
-            const password = document.getElementById('password').value;
-            const confirm = document.getElementById('confirmPassword').value;
-            const code = document.getElementById('code').value;
+            const password = document.getElementById("password").value;
+            const confirmPassword = document.getElementById("confirmPassword").value;
+            if (password !== confirmPassword) {
+                setMessage("两次输入的密码不一致。");
+                return;
+            }
 
-           
-
-            if (password !== confirm) return showMsg("两次输入的凭证不一致", true);
-
-            // 对应 UserRegisterDto (Body)
-            const bodyPayload = {
-                username: document.getElementById('username').value,
-                password: password,
-                email: document.getElementById('email').value,
-                phone: document.getElementById('phone').value
+            const payload = {
+                username: document.getElementById("username").value.trim(),
+                password,
+                email: document.getElementById("email").value.trim(),
+                phone: document.getElementById("phone").value.trim()
             };
 
-            try {
-                // Axios 会自动将 params 拼接到 URL 后面: /api/Account/register?code=xxxx
-                await api.post('/register', bodyPayload, {
-                    params: { code: code }
-                });
-
-                alert("申请成功，欢迎归宗！");
-                window.location.href = "login.html";
-            } catch (e) {
-                const errorInfo = e.response || "注册失败，验证码错误或已失效";
-                showMsg(errorInfo, true);
+            const code = document.getElementById("code").value.trim();
+            if (!code) {
+                setMessage("请先填写邮箱验证码。");
+                return;
             }
-        }
 
-        function showMsg(text, isError) {
-            const box = document.getElementById('msg-box');
-            box.innerText = text;
-            box.style.display = 'block';
-            box.style.backgroundColor = isError ? '#fff2f0' : '#f6ffed';
-            box.style.color = isError ? '#ff4d4f' : '#52c41a';
-            box.style.border = `1px solid ${isError ? '#ffccc7' : '#b7eb8f'}`;
-        }
+            try {
+                submitButton.disabled = true;
+                submitButton.textContent = "正在提交...";
+                await requestJson(`/api/Account/register?code=${encodeURIComponent(code)}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+                setMessage("注册成功，正在前往登录页。", "success");
+                setTimeout(() => {
+                    location.href = "login.html";
+                }, 800);
+            } catch (error) {
+                submitButton.disabled = false;
+                submitButton.textContent = "提交注册";
+                setMessage(error.message);
+            }
+        });
+
+        sendCodeButton.addEventListener("click", sendCode);
     </script>
 </body>
 </html>

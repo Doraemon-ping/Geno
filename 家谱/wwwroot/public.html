@@ -1,26 +1,29 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>万姓同根 - 公开族谱检索 - 赵氏宗亲平台</title>
-    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <title>万姓同根 - 公开族谱检索</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root {
             --primary: #8b4513;
+            --accent: #a0522d;
+            --gold: #d4af37;
             --paper: #fdfaf2;
-            --glass: rgba(255, 255, 255, 0.9);
+            --glass: rgba(255, 255, 255, 0.85);
         }
+
+        * { box-sizing: border-box; }
 
         body {
             margin: 0;
-            font-family: "Noto Serif SC", serif;
+            font-family: "Noto Serif SC", "楷体", serif;
             background: var(--paper);
             color: #333;
-            padding-top: 80px; /* 为固定导航留空 */
+            padding-top: 80px;
         }
 
-        /* --- 统一导航栏 --- */
         .navbar {
             position: fixed;
             top: 0;
@@ -37,289 +40,384 @@
         }
 
         .logo {
-            font-size: 24px;
-            color: var(--primary);
-            text-decoration: none;
+            font-size: 28px;
             font-weight: bold;
+            color: var(--primary);
+            letter-spacing: 4px;
+            text-decoration: none;
         }
 
         .nav-links {
             display: flex;
-            gap: 25px;
+            gap: 24px;
+            align-items: center;
+            flex-wrap: wrap;
         }
 
-            .nav-links a {
-                text-decoration: none;
-                color: #666;
-                transition: 0.3s;
-            }
+        .nav-links a,
+        .nav-links button {
+            text-decoration: none;
+            color: #555;
+            font-size: 16px;
+            background: none;
+            border: none;
+            font-family: inherit;
+            cursor: pointer;
+            position: relative;
+            padding: 0;
+        }
 
-                .nav-links a:hover {
-                    color: var(--primary);
-                }
+        .nav-links a:hover,
+        .nav-links button:hover {
+            color: var(--primary);
+        }
 
-        /* --- 搜索区 (Hero Search) --- */
-        .search-hero {
-            height: 300px;
-            background: linear-gradient(rgba(139, 69, 19, 0.1), rgba(139, 69, 19, 0.05)), url('https://www.transparenttextures.com/patterns/pinstriped-suit.png');
+        .nav-links a.active::after {
+            content: "";
+            position: absolute;
+            bottom: -5px;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: var(--primary);
+        }
+
+        .hero {
+            height: 280px;
+            background: linear-gradient(rgba(44, 30, 22, 0.45), rgba(44, 30, 22, 0.45)), url("https://images.unsplash.com/photo-1516542076529-1ea3854896f2?q=80&w=1800") center/cover;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
+            color: white;
             text-align: center;
-            border-bottom: 1px solid #eee;
-        }
-
-            .search-hero h1 {
-                font-size: 36px;
-                color: var(--primary);
-                margin-bottom: 20px;
-                letter-spacing: 5px;
-            }
-
-        .search-box {
-            width: 90%;
-            max-width: 600px;
-            position: relative;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-        }
-
-            .search-box input {
-                width: 100%;
-                padding: 18px 30px;
-                border-radius: 50px;
-                border: 2px solid var(--primary);
-                font-size: 18px;
-                outline: none;
-                font-family: inherit;
-            }
-
-            .search-box i {
-                position: absolute;
-                right: 25px;
-                top: 20px;
-                font-size: 20px;
-                color: var(--primary);
-            }
-
-        /* --- 瀑布流容器 --- */
-        .container {
-            max-width: 1200px;
-            margin: 50px auto;
             padding: 0 20px;
         }
 
-        .grid-header {
+        .hero h1 {
+            margin: 0 0 10px;
+            font-size: 40px;
+            letter-spacing: 8px;
+        }
+
+        .hero p {
+            margin: 0;
+            font-size: 16px;
+            opacity: 0.92;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: -40px auto 50px;
+            padding: 0 20px;
+        }
+
+        .panel {
+            background: white;
+            padding: 28px;
+            border-radius: 4px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.05);
+            margin-bottom: 24px;
+        }
+
+        .section-title {
+            font-size: 22px;
+            color: var(--primary);
+            border-left: 5px solid var(--primary);
+            padding-left: 15px;
+            margin-bottom: 22px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 30px;
+            gap: 12px;
         }
 
-        .filter-tags {
-            display: flex;
-            gap: 15px;
-        }
-
-        .tag {
-            padding: 5px 15px;
-            background: white;
-            border: 1px solid #ddd;
-            border-radius: 20px;
-            cursor: pointer;
-            font-size: 14px;
-        }
-
-            .tag.active {
-                background: var(--primary);
-                color: white;
-                border-color: var(--primary);
-            }
-
-        .public-grid {
+        .toolbar {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 25px;
-        }
-
-        /* --- 现代化卡片 --- */
-        .tree-card {
-            background: white;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-            transition: 0.4s;
-            display: flex;
-            flex-direction: column;
-            border: 1px solid transparent;
-        }
-
-            .tree-card:hover {
-                transform: translateY(-10px);
-                border-color: var(--primary);
-                box-shadow: 0 15px 40px rgba(139, 69, 19, 0.1);
-            }
-
-        .card-cover {
-            height: 120px;
-            background: #faf4ed;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 40px;
-            color: var(--primary);
-            border-bottom: 1px solid #f0f0f0;
-        }
-
-        .card-content {
-            padding: 20px;
-            flex: 1;
-        }
-
-        .card-title {
-            font-size: 20px;
-            font-weight: bold;
-            color: var(--primary);
+            grid-template-columns: 2fr 1fr;
+            gap: 16px;
             margin-bottom: 10px;
         }
 
-        .card-meta {
+        .toolbar input,
+        .toolbar select {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1px solid rgba(139, 69, 19, 0.18);
+            border-radius: 2px;
+            font-family: inherit;
+            background: #fffdf8;
+        }
+
+        .summary {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            color: #777;
+            font-size: 14px;
+        }
+
+        .summary span {
+            background: #faf7f2;
+            padding: 8px 12px;
+            border-left: 3px solid var(--gold);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 22px;
+        }
+
+        .tree-card {
+            background: white;
+            border-radius: 4px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+            overflow: hidden;
+            border-top: 4px solid transparent;
+            transition: 0.35s;
+        }
+
+        .tree-card:hover {
+            transform: translateY(-8px);
+            border-top-color: var(--primary);
+        }
+
+        .tree-cover {
+            height: 120px;
+            background: linear-gradient(135deg, rgba(139, 69, 19, 0.92), rgba(160, 82, 45, 0.9));
+            color: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tree-cover strong {
+            font-size: 24px;
+            letter-spacing: 2px;
+        }
+
+        .tree-body {
+            padding: 22px;
+        }
+
+        .tree-body h3 {
+            margin: 0 0 12px;
+            color: var(--primary);
+            font-size: 22px;
+        }
+
+        .tree-body p {
+            margin: 0 0 14px;
+            color: #666;
+            line-height: 1.7;
+            font-size: 14px;
+        }
+
+        .tree-meta {
             font-size: 13px;
             color: #888;
             line-height: 1.8;
         }
 
-        .card-footer {
-            padding: 15px 20px;
-            background: #fafafa;
-            border-top: 1px solid #f0f0f0;
+        .tree-footer {
+            padding: 0 22px 22px;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            gap: 12px;
         }
 
-        .view-btn {
-            color: var(--primary);
+        .tree-footer a {
             text-decoration: none;
+            color: var(--primary);
             font-weight: bold;
-            font-size: 14px;
         }
 
-        /* --- 加载动画 --- */
-        .loader {
+        .link-button {
+            border: none;
+            background: var(--primary);
+            color: white;
+            padding: 8px 14px;
+            border-radius: 2px;
+            cursor: pointer;
+            font-family: inherit;
+            text-decoration: none;
+        }
+
+        .empty {
+            color: #999;
             text-align: center;
-            padding: 50px;
-            color: var(--primary);
-            font-size: 18px;
+            padding: 30px 10px;
+        }
+
+        @media (max-width: 768px) {
+            .navbar { padding: 0 20px; height: auto; min-height: 80px; }
+            .toolbar { grid-template-columns: 1fr; }
+            .hero h1 { font-size: 30px; }
         }
     </style>
 </head>
 <body>
-
     <nav class="navbar">
-        <a href="index.html" class="logo">赵氏家谱</a>
+        <a class="logo" href="index.html">赵氏家谱</a>
         <div class="nav-links">
             <a href="index.html">首页</a>
-            <a href="my-trees.html">我的族谱</a>
-            <a href="public.html" style="color:var(--primary); font-weight:bold;">万姓同根</a>
-            <a href="profile.html">个人中心</a>
+            <a href="my-trees.html" id="myTreesNav" style="display:none">我的族谱</a>
+            <a href="public.html" class="active">万姓同根</a>
+            <a href="profile.html" id="profileNav" style="display:none">个人中心</a>
+            <a href="admin-audit.html" id="auditNav" style="display:none">族务审批</a>
+            <a href="login.html" id="loginNav">登录</a>
+            <a href="register.html" id="registerNav">申请入谱</a>
+            <button id="logoutBtn" style="display:none">退出</button>
         </div>
     </nav>
 
-    <header class="search-hero">
-        <h1>溯源寻根</h1>
-        <div class="search-box">
-            <input type="text" id="searchInput" placeholder="搜索家族名称、地区或始祖..." oninput="handleSearch()">
-            <i>🔍</i>
-        </div>
+    <header class="hero">
+        <h1>万姓同根 · 谱系可寻</h1>
+        <p>浏览已公开卷宗，先阅目录，再入其卷。</p>
     </header>
 
     <div class="container">
-        <div class="grid-header">
-            <div class="filter-tags">
-                <div class="tag active">全部支脉</div>
-                <div class="tag">汴京系</div>
-                <div class="tag">岭南系</div>
-                <div class="tag">江南系</div>
+        <div class="panel">
+            <div class="section-title">
+                <span>公开卷宗检索</span>
+                <span style="font-size:14px;color:#888">目录可直览，详情需登录</span>
             </div>
-            <div style="font-size: 14px; color: #999;">
-                共找到 <span id="treeCount" style="color:var(--primary); font-weight:bold;">0</span> 卷公开谱系
+            <div class="toolbar">
+                <input id="searchInput" type="text" placeholder="按卷宗名称、始祖、地区搜索">
+                <select id="regionFilter">
+                    <option value="">全部地区</option>
+                </select>
+            </div>
+            <div class="summary" style="margin-top:16px">
+                <span>公开卷宗：<b id="treeCount">0</b></span>
+                <span>累计字辈：<b id="poemCount">0</b></span>
+                <span id="identityTag">当前身份：游客</span>
             </div>
         </div>
 
-        <div id="loader" class="loader">正在翻阅陈年卷宗...</div>
-        <div id="publicGrid" class="public-grid" style="display:none">
+        <div class="grid" id="treeGrid">
+            <div class="empty">正在翻阅卷宗...</div>
         </div>
     </div>
 
     <script>
-        const token = localStorage.getItem('token');
-        const api = axios.create({
-            baseURL: '/api',
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const token = localStorage.getItem("token");
+        let allTrees = [];
 
-        let allTrees = []; // 存储所有获取到的数据用于本地搜索
+        function authHeaders() {
+            return token ? { Authorization: `Bearer ${token}` } : {};
+        }
 
-        window.onload = async () => {
-            if (!token) location.href = 'login.html';
-            await loadAllPublicTrees();
-        };
+        async function requestJson(url, options = {}) {
+            const response = await fetch(url, options);
+            const contentType = response.headers.get("content-type") || "";
+            const payload = contentType.includes("application/json") ? await response.json() : await response.text();
+            if (!response.ok) {
+                const message = typeof payload === "string" ? payload : payload?.message;
+                throw new Error(message || "请求失败");
+            }
+            return payload;
+        }
 
-        // 对接接口：/api/GenoTree/GetAll
-        async function loadAllPublicTrees() {
+        function initNav() {
+            if (!token) return;
+            document.getElementById("myTreesNav").style.display = "inline";
+            document.getElementById("profileNav").style.display = "inline";
+            document.getElementById("loginNav").style.display = "none";
+            document.getElementById("registerNav").style.display = "none";
+            document.getElementById("logoutBtn").style.display = "inline";
+            document.getElementById("identityTag").innerHTML = "当前身份：<b>已登录族人</b>";
+            document.getElementById("logoutBtn").addEventListener("click", () => {
+                localStorage.removeItem("token");
+                location.reload();
+            });
+        }
+
+        async function tryLoadProfile() {
+            if (!token) return;
             try {
-                const response = await api.get('/GenoTree/GetAll');
-                allTrees = response.data || [];
-                renderTrees(allTrees);
-
-                document.getElementById('loader').style.display = 'none';
-                document.getElementById('publicGrid').style.display = 'grid';
-            } catch (e) {
-                document.getElementById('loader').innerText = "暂无查看公开卷宗的权限。";
+                const result = await requestJson("/api/Account/profile", { headers: authHeaders() });
+                if (result.data.roleType === 0) {
+                    document.getElementById("auditNav").style.display = "inline";
+                }
+            } catch {
+                localStorage.removeItem("token");
             }
         }
 
-        function renderTrees(data) {
-            const container = document.getElementById('publicGrid');
-            const countLabel = document.getElementById('treeCount');
+        function renderTrees(list) {
+            document.getElementById("treeCount").textContent = list.length;
+            document.getElementById("poemCount").textContent = list.reduce((sum, item) => sum + (item.poems?.length || 0), 0);
 
-            countLabel.innerText = data.length;
-
-            if (data.length === 0) {
-                container.innerHTML = `<p style="grid-column: 1/-1; text-align:center; color:#999; margin-top:50px;">未发现匹配的家族谱系。</p>`;
+            const grid = document.getElementById("treeGrid");
+            if (!list.length) {
+                grid.innerHTML = '<div class="empty">未找到符合条件的公开卷宗。</div>';
                 return;
             }
 
-            container.innerHTML = data.map(t => `
+            grid.innerHTML = list.map(tree => `
                 <div class="tree-card">
-                    <div class="card-cover">📜</div>
-                    <div class="card-content">
-                        <div class="card-title">${t.treeName}</div>
-                        <div class="card-meta">
-                            <div>始祖：${t.ancestorName || '未详'}</div>
-                            <div>地区：${t.region || '跨区域'}</div>
-                            <div style="margin-top:8px; color:#666; height:36px; overflow:hidden;">${t.description || '暂无家族描述...'}</div>
+                    <div class="tree-cover">
+                        <span>公开卷宗</span>
+                        <strong>${(tree.treeName || "赵氏家谱").slice(0, 6)}</strong>
+                    </div>
+                    <div class="tree-body">
+                        <h3>${tree.treeName}</h3>
+                        <p>${tree.description || "当前卷宗已开放目录浏览，登录后可进入详情页查看字辈内容。"}</p>
+                        <div class="tree-meta">
+                            始祖：${tree.ancestorName || "未载"}<br>
+                            地区：${tree.region || "未标注"}<br>
+                            字辈数：${tree.poems?.length || 0}
                         </div>
                     </div>
-                    <div class="card-footer">
-                        <span style="font-size:11px; color:#bbb;">公开档案</span>
-                        <a href="tree-detail.html?id=${t.treeID}" class="view-btn">阅读卷宗 →</a>
+                    <div class="tree-footer">
+                        <span style="font-size:12px;color:#999">赵氏公开谱系</span>
+                        <a class="link-button" href="${token ? `tree-detail.html?id=${tree.treeID}` : `login.html?redirect=${encodeURIComponent(`tree-detail.html?id=${tree.treeID}`)}`}">
+                            ${token ? "查阅" : "登录后查阅"}
+                        </a>
                     </div>
                 </div>
-            `).join('');
+            `).join("");
         }
 
-        // 本地实时搜索过滤
-        function handleSearch() {
-            const keyword = document.getElementById('searchInput').value.toLowerCase();
-            const filtered = allTrees.filter(t =>
-                t.treeName.toLowerCase().includes(keyword) ||
-                (t.ancestorName && t.ancestorName.toLowerCase().includes(keyword)) ||
-                (t.region && t.region.toLowerCase().includes(keyword))
-            );
+        function fillRegionFilter(list) {
+            const regionFilter = document.getElementById("regionFilter");
+            const regions = [...new Set(list.map(item => item.region).filter(Boolean))];
+            regionFilter.innerHTML = '<option value="">全部地区</option>' + regions.map(region => `<option value="${region}">${region}</option>`).join("");
+        }
+
+        function applyFilters() {
+            const keyword = document.getElementById("searchInput").value.trim().toLowerCase();
+            const region = document.getElementById("regionFilter").value;
+            const filtered = allTrees.filter(tree => {
+                const hitKeyword = !keyword || [tree.treeName, tree.ancestorName, tree.region, tree.description].filter(Boolean).some(value => String(value).toLowerCase().includes(keyword));
+                const hitRegion = !region || tree.region === region;
+                return hitKeyword && hitRegion;
+            });
             renderTrees(filtered);
         }
+
+        async function loadTrees() {
+            try {
+                const result = await requestJson("/api/GenoTree/GetAll", { headers: authHeaders() });
+                allTrees = Array.isArray(result) ? result.filter(item => item.isPublic) : [];
+                fillRegionFilter(allTrees);
+                renderTrees(allTrees);
+            } catch (error) {
+                document.getElementById("treeGrid").innerHTML = `<div class="empty">${error.message}</div>`;
+            }
+        }
+
+        document.getElementById("searchInput").addEventListener("input", applyFilters);
+        document.getElementById("regionFilter").addEventListener("change", applyFilters);
+
+        initNav();
+        tryLoadProfile();
+        loadTrees();
     </script>
 </body>
 </html>
