@@ -1,7 +1,7 @@
 namespace 家谱.Models.DTOs
 {
     /// <summary>
-    /// 数据库操作日志展示对象。
+    /// 数据库日志展示对象。
     /// </summary>
     public class DataLogDto
     {
@@ -15,11 +15,7 @@ namespace 家谱.Models.DTOs
 
         public string TargetTable { get; set; } = string.Empty;
 
-        public Guid TargetId { get; set; }
-
         public string OpType { get; set; } = string.Empty;
-
-        public Guid? OperatorId { get; set; }
 
         public string OperatorName { get; set; } = string.Empty;
 
@@ -28,5 +24,25 @@ namespace 家谱.Models.DTOs
         public object? BeforeData { get; set; }
 
         public object? AfterData { get; set; }
+    }
+
+    /// <summary>
+    /// 数据库日志查询条件。
+    /// </summary>
+    public class DataLogQueryDto
+    {
+        public string? Keyword { get; set; }
+
+        public string? TargetTable { get; set; }
+
+        public string? OpType { get; set; }
+
+        public DateTime? CreatedFrom { get; set; }
+
+        public DateTime? CreatedTo { get; set; }
+
+        public int Page { get; set; } = 1;
+
+        public int PageSize { get; set; } = 20;
     }
 }

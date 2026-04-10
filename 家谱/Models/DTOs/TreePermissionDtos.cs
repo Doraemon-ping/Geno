@@ -45,12 +45,21 @@ namespace 家谱.Models.DTOs
     {
         public bool IsSuperAdmin { get; set; }
 
+        public bool IsSystemAdmin { get; set; }
+
         public bool IsOwner { get; set; }
 
         public byte? RoleType { get; set; }
 
         public string RoleName { get; set; } = "访客";
 
+        public bool CanView { get; set; }
+
+        public bool CanSubmitChange { get; set; }
+
+        public bool CanDirectEdit { get; set; }
+
+        // 兼容旧前端字段，语义等同于“可直接修改”。
         public bool CanEdit { get; set; }
 
         public bool CanReview { get; set; }

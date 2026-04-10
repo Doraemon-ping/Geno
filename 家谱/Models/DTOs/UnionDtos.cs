@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 namespace 家谱.Models.DTOs
 {
     /// <summary>
-    /// 婚姻单元创建/修改请求。
+    /// 婚姻单元创建或修改请求。
     /// </summary>
     public class GenoUnionDto
     {

@@ -10,6 +10,9 @@ using 家谱.Services;
 
 namespace 家谱.Controllers
 {
+    /// <summary>
+    /// 字辈控制器。
+    /// </summary>
     [Authorize]
     [ApiController]
     [Route("api/[controller]")]
@@ -32,15 +35,16 @@ namespace 家谱.Controllers
             _treePermissionService = treePermissionService;
         }
 
+        [AllowAnonymous]
         [HttpGet("tree/{treeId}")]
         public async Task<IActionResult> GetList(Guid treeId)
         {
             var tree = await _genoTreeService.GetByIdAsync(treeId) ?? throw new KeyNotFoundException("家谱树不存在");
-            var currentUserId = GetCurrentUserId();
+            var currentUserId = TryGetCurrentUserId();
 
             if (!await _treePermissionService.CanViewTreeAsync(tree, currentUserId))
             {
-                throw new UnauthorizedAccessException("无权限访问此资源");
+                throw new UnauthorizedAccessException("无权访问该家谱树");
             }
 
             var list = await _poemService.GetByTreeIdAsync(treeId);
@@ -52,13 +56,14 @@ namespace 家谱.Controllers
         {
             var tree = await _genoTreeService.GetByIdAsync(dto.TreeId) ?? throw new KeyNotFoundException("家谱树不存在");
             var currentUserId = GetCurrentUserId();
+            var access = await _treePermissionService.GetTreeAccessAsync(tree.TreeID, currentUserId);
 
-            if (!await _treePermissionService.CanViewTreeAsync(tree, currentUserId))
+            if (!access.CanView)
             {
-                throw new UnauthorizedAccessException("无权限访问此资源");
+                throw new UnauthorizedAccessException("无权访问该家谱树");
             }
 
-            if (GetCurrentUserRole() == (byte)RoleType.SuperAdmin || await _treePermissionService.CanEditTreeAsync(tree.TreeID, currentUserId))
+            if (access.CanDirectEdit)
             {
                 var poem = await _poemService.CreateAsync(dto, currentUserId);
                 return Ok(ApiResponse.OK(new WorkflowResultDto
@@ -69,12 +74,17 @@ namespace 家谱.Controllers
                 }));
             }
 
+            if (!access.CanSubmitChange)
+            {
+                throw new UnauthorizedAccessException("当前身份不允许提交字辈变更申请");
+            }
+
             var taskId = await _reviewService.SubmitAsync(new SubmitReviewRequest
             {
                 TreeId = dto.TreeId,
                 ActionCode = ReviewActions.PoemCreate,
                 ChangeData = JsonSerializer.Serialize(dto, JsonDefaults.Options),
-                Reason = "普通用户提交新增字辈申请",
+                Reason = "修谱员提交新增字辈申请",
                 ForceCreateTask = true
             }, currentUserId);
 
@@ -82,7 +92,7 @@ namespace 家谱.Controllers
             {
                 SubmittedForReview = true,
                 TaskId = taskId,
-                Message = "新增字辈申请已提交，等待审核"
+                Message = "新增字辈申请已提交，等待树拥有者或树管理员审核"
             }));
         }
 
@@ -91,19 +101,20 @@ namespace 家谱.Controllers
         {
             var tree = await _genoTreeService.GetByIdAsync(dto.TreeId) ?? throw new KeyNotFoundException("家谱树不存在");
             var currentUserId = GetCurrentUserId();
+            var access = await _treePermissionService.GetTreeAccessAsync(tree.TreeID, currentUserId);
 
-            if (!await _treePermissionService.CanViewTreeAsync(tree, currentUserId))
+            if (!access.CanView)
             {
-                throw new UnauthorizedAccessException("无权限访问此资源");
+                throw new UnauthorizedAccessException("无权访问该家谱树");
             }
 
             var poem = await _poemService.GetByIdAsync(poemId) ?? throw new KeyNotFoundException("字辈不存在");
             if (poem.TreeID != dto.TreeId)
             {
-                throw new ArgumentException("不允许修改树ID，必须在同一棵树内修改");
+                throw new ArgumentException("不允许修改树 ID，必须在同一棵树内修改");
             }
 
-            if (GetCurrentUserRole() == (byte)RoleType.SuperAdmin || await _treePermissionService.CanEditTreeAsync(tree.TreeID, currentUserId))
+            if (access.CanDirectEdit)
             {
                 var success = await _poemService.UpdateAsync(dto, poemId, currentUserId);
                 if (!success)
@@ -118,20 +129,25 @@ namespace 家谱.Controllers
                 }));
             }
 
+            if (!access.CanSubmitChange)
+            {
+                throw new UnauthorizedAccessException("当前身份不允许提交字辈修改申请");
+            }
+
             var taskId = await _reviewService.SubmitAsync(new SubmitReviewRequest
             {
                 TreeId = dto.TreeId,
                 TargetId = poemId,
                 ActionCode = ReviewActions.PoemUpdate,
                 ChangeData = JsonSerializer.Serialize(dto, JsonDefaults.Options),
-                Reason = "普通用户提交字辈修改申请"
+                Reason = "修谱员提交字辈修改申请"
             }, currentUserId);
 
             return Ok(ApiResponse.OK(new WorkflowResultDto
             {
                 SubmittedForReview = true,
                 TaskId = taskId,
-                Message = "字辈修改申请已提交，等待审核"
+                Message = "字辈修改申请已提交，等待树拥有者或树管理员审核"
             }));
         }
 
@@ -141,13 +157,14 @@ namespace 家谱.Controllers
             var poem = await _poemService.GetByIdAsync(id) ?? throw new KeyNotFoundException("字辈不存在");
             var tree = await _genoTreeService.GetByIdAsync(poem.TreeID) ?? throw new KeyNotFoundException("家谱树不存在");
             var currentUserId = GetCurrentUserId();
+            var access = await _treePermissionService.GetTreeAccessAsync(tree.TreeID, currentUserId);
 
-            if (!await _treePermissionService.CanViewTreeAsync(tree, currentUserId))
+            if (!access.CanView)
             {
-                throw new UnauthorizedAccessException("无权限访问此资源");
+                throw new UnauthorizedAccessException("无权访问该家谱树");
             }
 
-            if (GetCurrentUserRole() == (byte)RoleType.SuperAdmin || await _treePermissionService.CanEditTreeAsync(tree.TreeID, currentUserId))
+            if (access.CanDirectEdit)
             {
                 var success = await _poemService.DeleteAsync(id, currentUserId);
                 if (!success)
@@ -160,6 +177,11 @@ namespace 家谱.Controllers
                     AppliedDirectly = true,
                     Message = "字辈删除成功"
                 }));
+            }
+
+            if (!access.CanSubmitChange)
+            {
+                throw new UnauthorizedAccessException("当前身份不允许提交字辈删除申请");
             }
 
             var taskId = await _reviewService.SubmitAsync(new SubmitReviewRequest
@@ -175,14 +197,14 @@ namespace 家谱.Controllers
                     poem.Word,
                     poem.Meaning
                 }, JsonDefaults.Options),
-                Reason = "普通用户提交字辈删除申请"
+                Reason = "修谱员提交字辈删除申请"
             }, currentUserId);
 
             return Ok(ApiResponse.OK(new WorkflowResultDto
             {
                 SubmittedForReview = true,
                 TaskId = taskId,
-                Message = "字辈删除申请已提交，等待审核"
+                Message = "字辈删除申请已提交，等待树拥有者或树管理员审核"
             }));
         }
 
@@ -197,15 +219,10 @@ namespace 家谱.Controllers
             return userId;
         }
 
-        private byte GetCurrentUserRole()
+        private Guid? TryGetCurrentUserId()
         {
-            var roleClaim = User.FindFirst(ClaimTypes.Role)?.Value;
-            if (!byte.TryParse(roleClaim, out var role))
-            {
-                throw new UnauthorizedAccessException("无法解析当前用户角色");
-            }
-
-            return role;
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            return Guid.TryParse(userIdClaim, out var userId) ? userId : null;
         }
     }
 }

@@ -38,19 +38,63 @@ namespace 家谱.Controllers
         /// <summary>
         /// 获取树成员列表。
         /// </summary>
+        [AllowAnonymous]
         [HttpGet("tree/{treeId}")]
         public async Task<IActionResult> GetList(Guid treeId)
         {
             var tree = await _treeService.GetByIdAsync(treeId) ?? throw new KeyNotFoundException("家谱树不存在");
-            var currentUserId = GetCurrentUserId();
+            var currentUserId = TryGetCurrentUserId();
 
             if (!await _treePermissionService.CanViewTreeAsync(tree, currentUserId))
             {
-                throw new UnauthorizedAccessException("无权限访问此资源");
+                throw new UnauthorizedAccessException("无权访问该家谱树");
             }
 
             var members = await _memberService.GetByTreeIdAsync(treeId);
             return Ok(ApiResponse.OK(members));
+        }
+
+        /// <summary>
+        /// 统一查询树成员，支持多条件筛选和分页。
+        /// </summary>
+        [AllowAnonymous]
+        [HttpGet("query")]
+        public async Task<IActionResult> Query([FromQuery] MemberQueryDto dto)
+        {
+            if (dto.TreeId == Guid.Empty)
+            {
+                throw new ArgumentException("家谱树不能为空");
+            }
+
+            var tree = await _treeService.GetByIdAsync(dto.TreeId) ?? throw new KeyNotFoundException("家谱树不存在");
+            var currentUserId = TryGetCurrentUserId();
+
+            if (!await _treePermissionService.CanViewTreeAsync(tree, currentUserId))
+            {
+                throw new UnauthorizedAccessException("无权访问该家谱树");
+            }
+
+            var result = await _memberService.QueryAsync(dto);
+            return Ok(ApiResponse.OK(result));
+        }
+
+        /// <summary>
+        /// 获取成员详情。
+        /// </summary>
+        [AllowAnonymous]
+        [HttpGet("Get/{id}")]
+        public async Task<IActionResult> Get(Guid id)
+        {
+            var member = await _memberService.GetByIdAsync(id) ?? throw new KeyNotFoundException("树成员不存在");
+            var tree = await _treeService.GetByIdAsync(member.TreeID) ?? throw new KeyNotFoundException("家谱树不存在");
+            var currentUserId = TryGetCurrentUserId();
+
+            if (!await _treePermissionService.CanViewTreeAsync(tree, currentUserId))
+            {
+                throw new UnauthorizedAccessException("无权访问该家谱树");
+            }
+
+            return Ok(ApiResponse.OK(member));
         }
 
         /// <summary>
@@ -61,13 +105,14 @@ namespace 家谱.Controllers
         {
             var tree = await _treeService.GetByIdAsync(dto.TreeId) ?? throw new KeyNotFoundException("家谱树不存在");
             var currentUserId = GetCurrentUserId();
+            var access = await _treePermissionService.GetTreeAccessAsync(tree.TreeID, currentUserId);
 
-            if (!await _treePermissionService.CanViewTreeAsync(tree, currentUserId))
+            if (!access.CanView)
             {
-                throw new UnauthorizedAccessException("无权限访问此资源");
+                throw new UnauthorizedAccessException("无权访问该家谱树");
             }
 
-            if (GetCurrentUserRole() == (byte)RoleType.SuperAdmin || await _treePermissionService.CanEditTreeAsync(tree.TreeID, currentUserId))
+            if (access.CanDirectEdit)
             {
                 var member = await _memberService.CreateAsync(dto, currentUserId);
                 return Ok(ApiResponse.OK(new WorkflowResultDto
@@ -78,12 +123,17 @@ namespace 家谱.Controllers
                 }));
             }
 
+            if (!access.CanSubmitChange)
+            {
+                throw new UnauthorizedAccessException("当前身份不允许提交树成员变更申请");
+            }
+
             var taskId = await _reviewService.SubmitAsync(new SubmitReviewRequest
             {
                 TreeId = dto.TreeId,
                 ActionCode = ReviewActions.MemberCreate,
                 ChangeData = JsonSerializer.Serialize(dto, JsonDefaults.Options),
-                Reason = "普通用户提交新增树成员申请",
+                Reason = "修谱员提交新增树成员申请",
                 ForceCreateTask = true
             }, currentUserId);
 
@@ -109,13 +159,14 @@ namespace 家谱.Controllers
 
             var tree = await _treeService.GetByIdAsync(dto.TreeId) ?? throw new KeyNotFoundException("家谱树不存在");
             var currentUserId = GetCurrentUserId();
+            var access = await _treePermissionService.GetTreeAccessAsync(tree.TreeID, currentUserId);
 
-            if (!await _treePermissionService.CanViewTreeAsync(tree, currentUserId))
+            if (!access.CanView)
             {
-                throw new UnauthorizedAccessException("无权限访问此资源");
+                throw new UnauthorizedAccessException("无权访问该家谱树");
             }
 
-            if (GetCurrentUserRole() == (byte)RoleType.SuperAdmin || await _treePermissionService.CanEditTreeAsync(tree.TreeID, currentUserId))
+            if (access.CanDirectEdit)
             {
                 var success = await _memberService.UpdateAsync(id, dto, currentUserId);
                 if (!success)
@@ -130,13 +181,18 @@ namespace 家谱.Controllers
                 }));
             }
 
+            if (!access.CanSubmitChange)
+            {
+                throw new UnauthorizedAccessException("当前身份不允许提交树成员修改申请");
+            }
+
             var taskId = await _reviewService.SubmitAsync(new SubmitReviewRequest
             {
                 TreeId = dto.TreeId,
                 TargetId = id,
                 ActionCode = ReviewActions.MemberUpdate,
                 ChangeData = JsonSerializer.Serialize(dto, JsonDefaults.Options),
-                Reason = "普通用户提交树成员修改申请"
+                Reason = "修谱员提交树成员修改申请"
             }, currentUserId);
 
             return Ok(ApiResponse.OK(new WorkflowResultDto
@@ -156,13 +212,14 @@ namespace 家谱.Controllers
             var member = await _memberService.GetByIdAsync(id) ?? throw new KeyNotFoundException("树成员不存在");
             var tree = await _treeService.GetByIdAsync(member.TreeID) ?? throw new KeyNotFoundException("家谱树不存在");
             var currentUserId = GetCurrentUserId();
+            var access = await _treePermissionService.GetTreeAccessAsync(tree.TreeID, currentUserId);
 
-            if (!await _treePermissionService.CanViewTreeAsync(tree, currentUserId))
+            if (!access.CanView)
             {
-                throw new UnauthorizedAccessException("无权限访问此资源");
+                throw new UnauthorizedAccessException("无权访问该家谱树");
             }
 
-            if (GetCurrentUserRole() == (byte)RoleType.SuperAdmin || await _treePermissionService.CanEditTreeAsync(tree.TreeID, currentUserId))
+            if (access.CanDirectEdit)
             {
                 var success = await _memberService.DeleteAsync(id, currentUserId);
                 if (!success)
@@ -175,6 +232,11 @@ namespace 家谱.Controllers
                     AppliedDirectly = true,
                     Message = "树成员已删除"
                 }));
+            }
+
+            if (!access.CanSubmitChange)
+            {
+                throw new UnauthorizedAccessException("当前身份不允许提交树成员删除申请");
             }
 
             var taskId = await _reviewService.SubmitAsync(new SubmitReviewRequest
@@ -194,7 +256,7 @@ namespace 家谱.Controllers
                     member.BirthDateRaw,
                     member.Biography
                 }, JsonDefaults.Options),
-                Reason = "普通用户提交树成员删除申请"
+                Reason = "修谱员提交树成员删除申请"
             }, currentUserId);
 
             return Ok(ApiResponse.OK(new WorkflowResultDto
@@ -216,15 +278,10 @@ namespace 家谱.Controllers
             return userId;
         }
 
-        private byte GetCurrentUserRole()
+        private Guid? TryGetCurrentUserId()
         {
-            var roleClaim = User.FindFirst(ClaimTypes.Role)?.Value;
-            if (!byte.TryParse(roleClaim, out var role))
-            {
-                throw new UnauthorizedAccessException("无法解析当前用户角色");
-            }
-
-            return role;
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            return Guid.TryParse(userIdClaim, out var userId) ? userId : null;
         }
     }
 }

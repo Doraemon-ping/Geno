@@ -56,7 +56,7 @@ namespace 家谱.Controllers
 
             if (dto.NewRole is not ((byte)RoleType.Admin) and not ((byte)RoleType.Editor))
             {
-                throw new ArgumentException("只能申请有效的系统权限");
+                throw new ArgumentException("只能申请有效的系统角色");
             }
 
             if (currentUser.RoleType == dto.NewRole)
@@ -163,7 +163,7 @@ namespace 家谱.Controllers
             {
                 SubmittedForReview = true,
                 TaskId = taskId,
-                Message = "树权限申请已提交，等待审核"
+                Message = "树权限申请已提交，等待树拥有者或树管理员审核"
             }));
         }
 

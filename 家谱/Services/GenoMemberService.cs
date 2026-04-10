@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using 家谱.DB;
 using 家谱.Models.DTOs;
+using 家谱.Models.DTOs.Common;
 using 家谱.Models.Entities;
 
 namespace 家谱.Services
@@ -10,29 +11,16 @@ namespace 家谱.Services
     /// </summary>
     public interface IGenoMemberService
     {
-        /// <summary>
-        /// 获取指定树下的成员列表。
-        /// </summary>
         Task<List<GenoMember>> GetByTreeIdAsync(Guid treeId);
 
-        /// <summary>
-        /// 根据主键获取成员。
-        /// </summary>
+        Task<PagedResult<GenoMember>> QueryAsync(MemberQueryDto query);
+
         Task<GenoMember?> GetByIdAsync(Guid memberId);
 
-        /// <summary>
-        /// 创建树成员。
-        /// </summary>
         Task<GenoMember> CreateAsync(GenoMemberDto dto, Guid operatorUserId, Guid? taskId = null);
 
-        /// <summary>
-        /// 更新树成员。
-        /// </summary>
         Task<bool> UpdateAsync(Guid memberId, GenoMemberDto dto, Guid operatorUserId, Guid? taskId = null);
 
-        /// <summary>
-        /// 逻辑删除树成员。
-        /// </summary>
         Task<bool> DeleteAsync(Guid memberId, Guid operatorUserId, Guid? taskId = null);
     }
 
@@ -61,9 +49,113 @@ namespace 家谱.Services
                 .ToListAsync();
         }
 
+        public async Task<PagedResult<GenoMember>> QueryAsync(MemberQueryDto query)
+        {
+            var page = Math.Max(query.Page, 1);
+            var pageSize = Math.Clamp(query.PageSize, 1, 100);
+
+            var memberQuery = _db.GenoMembers
+                .AsNoTracking()
+                .Where(member => member.TreeID == query.TreeId && member.IsDel != true);
+
+            if (!string.IsNullOrWhiteSpace(query.Keyword))
+            {
+                var keyword = query.Keyword.Trim();
+                memberQuery = memberQuery.Where(member =>
+                    (member.LastName + member.FirstName).Contains(keyword) ||
+                    (member.Biography ?? string.Empty).Contains(keyword) ||
+                    (member.BirthDateRaw ?? string.Empty).Contains(keyword));
+            }
+
+            if (!string.IsNullOrWhiteSpace(query.Name))
+            {
+                var name = query.Name.Trim();
+                memberQuery = memberQuery.Where(member => (member.LastName + member.FirstName).Contains(name));
+            }
+
+            if (query.GenerationNum.HasValue)
+            {
+                memberQuery = memberQuery.Where(member => member.GenerationNum == query.GenerationNum.Value);
+            }
+
+            if (query.GenerationFrom.HasValue)
+            {
+                memberQuery = memberQuery.Where(member =>
+                    member.GenerationNum.HasValue &&
+                    member.GenerationNum.Value >= query.GenerationFrom.Value);
+            }
+
+            if (query.GenerationTo.HasValue)
+            {
+                memberQuery = memberQuery.Where(member =>
+                    member.GenerationNum.HasValue &&
+                    member.GenerationNum.Value <= query.GenerationTo.Value);
+            }
+
+            if (query.PoemId.HasValue)
+            {
+                memberQuery = memberQuery.Where(member => member.PoemID == query.PoemId.Value);
+            }
+
+            if (query.Gender.HasValue)
+            {
+                memberQuery = memberQuery.Where(member => member.Gender == query.Gender.Value);
+            }
+
+            if (query.IsLiving.HasValue)
+            {
+                memberQuery = memberQuery.Where(member => member.IsLiving == query.IsLiving.Value);
+            }
+
+            if (!string.IsNullOrWhiteSpace(query.PoemWord))
+            {
+                var poemWord = query.PoemWord.Trim();
+                var poemIds = await _db.GenoGenerationPoems
+                    .AsNoTracking()
+                    .Where(poem => poem.TreeID == query.TreeId && !poem.IsDel && poem.Word.Contains(poemWord))
+                    .Select(poem => poem.PoemID)
+                    .ToListAsync();
+
+                if (poemIds.Count == 0)
+                {
+                    return new PagedResult<GenoMember>
+                    {
+                        Items = Array.Empty<GenoMember>(),
+                        Page = page,
+                        PageSize = pageSize,
+                        TotalCount = 0,
+                        TotalPages = 0
+                    };
+                }
+
+                memberQuery = memberQuery.Where(member =>
+                    member.PoemID.HasValue &&
+                    poemIds.Contains(member.PoemID.Value));
+            }
+
+            var totalCount = await memberQuery.CountAsync();
+            var items = await memberQuery
+                .OrderBy(member => member.GenerationNum ?? int.MaxValue)
+                .ThenBy(member => member.LastName)
+                .ThenBy(member => member.FirstName)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return new PagedResult<GenoMember>
+            {
+                Items = items,
+                Page = page,
+                PageSize = pageSize,
+                TotalCount = totalCount,
+                TotalPages = totalCount == 0 ? 0 : (int)Math.Ceiling(totalCount / (double)pageSize)
+            };
+        }
+
         public async Task<GenoMember?> GetByIdAsync(Guid memberId)
         {
             return await _db.GenoMembers
+                .AsNoTracking()
                 .FirstOrDefaultAsync(member => member.MemberID == memberId && member.IsDel != true);
         }
 
@@ -90,19 +182,28 @@ namespace 家谱.Services
 
             _db.GenoMembers.Add(member);
             await _db.SaveChangesAsync();
-            await _auditLogService.WriteAsync("Geno_Members", member.MemberID, "CREATE", operatorUserId, new { }, new
-            {
+
+            await _auditLogService.WriteAsync(
+                "Geno_Members",
                 member.MemberID,
-                member.TreeID,
-                member.LastName,
-                member.FirstName,
-                member.GenerationNum,
-                member.Gender,
-                member.BirthDateRaw,
-                member.Biography,
-                member.SysUserId,
-                member.IsDel
-            }, taskId);
+                "CREATE",
+                operatorUserId,
+                new { },
+                new
+                {
+                    member.MemberID,
+                    member.TreeID,
+                    member.LastName,
+                    member.FirstName,
+                    member.GenerationNum,
+                    member.Gender,
+                    member.BirthDateRaw,
+                    member.Biography,
+                    member.SysUserId,
+                    member.IsDel
+                },
+                taskId);
+
             return member;
         }
 
@@ -132,6 +233,7 @@ namespace 家谱.Services
             member.SysUserId = dto.SysUserId;
 
             await _db.SaveChangesAsync();
+
             await _auditLogService.WriteAsync(
                 "Geno_Members",
                 member.MemberID,
@@ -155,7 +257,6 @@ namespace 家谱.Services
             }
 
             var before = BuildMemberLogSnapshot(member);
-
             member.IsDel = true;
 
             var childRelations = await _db.GenoUnionMembers

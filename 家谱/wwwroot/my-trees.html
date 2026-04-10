@@ -496,6 +496,7 @@
             grid.innerHTML = trees.map(tree => {
                 const access = tree.access || {};
                 const canEdit = Boolean(access.canEdit);
+                const canSubmitChange = Boolean(access.canSubmitChange);
                 const roleName = access.roleName || "访客";
                 return `
                     <div class="tree-card">
@@ -514,11 +515,11 @@
                         <div class="tree-desc">${tree.description || "当前卷宗尚未补充说明。"}</div>
                         <div class="tree-actions">
                             <a href="tree-detail.html?id=${tree.treeID}">进入卷宗</a>
-                            ${canEdit ? `<button class="secondary" onclick="editTree('${tree.treeID}')">修改</button>` : ""}
-                            ${canEdit ? `<button class="danger" onclick="deleteTree('${tree.treeID}')">删除</button>` : ""}
+                            ${canSubmitChange ? `<button class="secondary" onclick="editTree('${tree.treeID}')">${canEdit ? "修改" : "提交修改"}</button>` : ""}
+                            ${canSubmitChange ? `<button class="danger" onclick="deleteTree('${tree.treeID}')">${canEdit ? "删除" : "提交删除"}</button>` : ""}
                         </div>
                         <div class="note">
-                            ${canEdit ? "你拥有这棵树的直接维护权限，修改会立即生效。" : "你当前没有直接维护权限，相关操作会转为审核申请。"}
+                            ${canEdit ? "你拥有这棵树的直接维护权限，修改会立即生效。" : canSubmitChange ? "你当前可参与修谱，但提交的树信息变更会先进入审核。" : "你当前只有查看权限，如需参与修谱，请先申请树内角色。"}
                         </div>
                     </div>
                 `;

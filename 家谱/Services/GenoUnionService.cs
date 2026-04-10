@@ -69,26 +69,27 @@ namespace 家谱.Services
                 return new List<GenoUnionViewDto>();
             }
 
-            var memberIds = memberMap.Keys.ToHashSet();
-            var unions = await _db.GenoUnions
+            var unions = (await _db.GenoUnions
                 .AsNoTracking()
-                .Where(union => memberIds.Contains(union.Partner1ID) && memberIds.Contains(union.Partner2ID))
                 .OrderBy(union => union.SortOrder)
                 .ThenBy(union => union.MarriageDate)
                 .ThenBy(union => union.CreatedAt)
-                .ToListAsync();
+                .ToListAsync())
+                .Where(union => memberMap.ContainsKey(union.Partner1ID) && memberMap.ContainsKey(union.Partner2ID))
+                .ToList();
 
             if (unions.Count == 0)
             {
                 return new List<GenoUnionViewDto>();
             }
 
-            var unionIds = unions.Select(union => union.UnionID).ToList();
-            var unionMembers = await _db.GenoUnionMembers
+            var unionIdSet = unions.Select(union => union.UnionID).ToHashSet();
+            var unionMembers = (await _db.GenoUnionMembers
                 .AsNoTracking()
-                .Where(item => unionIds.Contains(item.UnionID))
                 .OrderBy(item => item.ChildOrder)
-                .ToListAsync();
+                .ToListAsync())
+                .Where(item => unionIdSet.Contains(item.UnionID))
+                .ToList();
 
             return unions
                 .Select(union => MapUnionDto(union, treeId, memberMap, unionMembers))
@@ -106,25 +107,32 @@ namespace 家谱.Services
                 return null;
             }
 
-            var memberIds = new HashSet<Guid> { union.Partner1ID, union.Partner2ID };
             var unionMembers = await _db.GenoUnionMembers
                 .AsNoTracking()
                 .Where(item => item.UnionID == unionId)
                 .OrderBy(item => item.ChildOrder)
                 .ToListAsync();
 
-            foreach (var item in unionMembers)
+            var partner1 = await _db.GenoMembers
+                .AsNoTracking()
+                .FirstOrDefaultAsync(member => member.MemberID == union.Partner1ID);
+
+            var partner2 = await _db.GenoMembers
+                .AsNoTracking()
+                .FirstOrDefaultAsync(member => member.MemberID == union.Partner2ID);
+
+            if (partner1 == null || partner2 == null)
             {
-                memberIds.Add(item.MemberID);
+                return null;
             }
 
             var members = await _db.GenoMembers
                 .AsNoTracking()
-                .Where(member => memberIds.Contains(member.MemberID))
+                .Where(member => member.TreeID == partner1.TreeID)
                 .ToListAsync();
 
             var memberMap = members.ToDictionary(member => member.MemberID);
-            if (!memberMap.TryGetValue(union.Partner1ID, out var partner1))
+            if (!memberMap.ContainsKey(union.Partner1ID) || !memberMap.ContainsKey(union.Partner2ID))
             {
                 return null;
             }

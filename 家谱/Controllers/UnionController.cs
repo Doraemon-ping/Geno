@@ -44,15 +44,16 @@ namespace 家谱.Controllers
         /// <summary>
         /// 获取树下的婚姻单元列表。
         /// </summary>
+        [AllowAnonymous]
         [HttpGet("tree/{treeId}")]
         public async Task<IActionResult> GetList(Guid treeId)
         {
             var tree = await _treeService.GetByIdAsync(treeId) ?? throw new KeyNotFoundException("家谱树不存在");
-            var currentUserId = GetCurrentUserId();
+            var currentUserId = TryGetCurrentUserId();
 
             if (!await _treePermissionService.CanViewTreeAsync(tree, currentUserId))
             {
-                throw new UnauthorizedAccessException("无权访问此资源");
+                throw new UnauthorizedAccessException("无权访问该资源");
             }
 
             var unions = await _unionService.GetByTreeIdAsync(treeId);
@@ -69,17 +70,9 @@ namespace 家谱.Controllers
             var tree = await _treeService.GetByIdAsync(treeId) ?? throw new KeyNotFoundException("家谱树不存在");
             var currentUserId = TryGetCurrentUserId();
 
-            if (!tree.IsPublic)
+            if (!await _treePermissionService.CanViewTreeAsync(tree, currentUserId))
             {
-                if (!currentUserId.HasValue)
-                {
-                    throw new UnauthorizedAccessException("无权访问此资源");
-                }
-
-                if (!await _treePermissionService.CanViewTreeAsync(tree, currentUserId.Value))
-                {
-                    throw new UnauthorizedAccessException("无权访问此资源");
-                }
+                throw new UnauthorizedAccessException("无权访问该资源");
             }
 
             var graph = await _unionGraphService.BuildTreeGraphAsync(treeId);
@@ -94,13 +87,14 @@ namespace 家谱.Controllers
         {
             var tree = await _treeService.GetByIdAsync(dto.TreeId) ?? throw new KeyNotFoundException("家谱树不存在");
             var currentUserId = GetCurrentUserId();
+            var access = await _treePermissionService.GetTreeAccessAsync(dto.TreeId, currentUserId);
 
-            if (!await _treePermissionService.CanViewTreeAsync(tree, currentUserId))
+            if (!access.CanView)
             {
-                throw new UnauthorizedAccessException("无权访问此资源");
+                throw new UnauthorizedAccessException("无权访问该资源");
             }
 
-            if (GetCurrentUserRole() == (byte)RoleType.SuperAdmin || await _treePermissionService.CanEditTreeAsync(dto.TreeId, currentUserId))
+            if (access.CanDirectEdit)
             {
                 var union = await _unionService.CreateAsync(dto, currentUserId);
                 return Ok(ApiResponse.OK(new WorkflowResultDto
@@ -109,6 +103,11 @@ namespace 家谱.Controllers
                     Message = "婚姻单元创建成功",
                     Data = new { unionId = union.UnionID }
                 }));
+            }
+
+            if (!access.CanSubmitChange)
+            {
+                throw new UnauthorizedAccessException("当前身份不允许提交婚姻单元变更申请");
             }
 
             var partner1 = await _memberService.GetByIdAsync(dto.Partner1Id) ?? throw new KeyNotFoundException("伴侣 1 不存在");
@@ -130,7 +129,7 @@ namespace 家谱.Controllers
                     dto.SortOrder,
                     dto.MarriageDate
                 }, JsonDefaults.Options),
-                Reason = "普通用户提交新增婚姻单元申请",
+                Reason = "修谱员提交新增婚姻单元申请",
                 ForceCreateTask = true
             }, currentUserId);
 
@@ -138,7 +137,7 @@ namespace 家谱.Controllers
             {
                 SubmittedForReview = true,
                 TaskId = taskId,
-                Message = "新增婚姻单元申请已提交，等待审核"
+                Message = "新增婚姻单元申请已提交，等待树拥有者或树管理员审核"
             }));
         }
 
@@ -151,13 +150,14 @@ namespace 家谱.Controllers
             var union = await _unionService.GetByIdAsync(id) ?? throw new KeyNotFoundException("婚姻单元不存在");
             var tree = await _treeService.GetByIdAsync(union.TreeId) ?? throw new KeyNotFoundException("家谱树不存在");
             var currentUserId = GetCurrentUserId();
+            var access = await _treePermissionService.GetTreeAccessAsync(union.TreeId, currentUserId);
 
-            if (!await _treePermissionService.CanViewTreeAsync(tree, currentUserId))
+            if (!access.CanView)
             {
-                throw new UnauthorizedAccessException("无权访问此资源");
+                throw new UnauthorizedAccessException("无权访问该资源");
             }
 
-            if (GetCurrentUserRole() == (byte)RoleType.SuperAdmin || await _treePermissionService.CanEditTreeAsync(union.TreeId, currentUserId))
+            if (access.CanDirectEdit)
             {
                 var success = await _unionService.DeleteAsync(id, currentUserId);
                 if (!success)
@@ -172,20 +172,25 @@ namespace 家谱.Controllers
                 }));
             }
 
+            if (!access.CanSubmitChange)
+            {
+                throw new UnauthorizedAccessException("当前身份不允许提交婚姻单元删除申请");
+            }
+
             var taskId = await _reviewService.SubmitAsync(new SubmitReviewRequest
             {
                 TreeId = union.TreeId,
                 TargetId = id,
                 ActionCode = ReviewActions.UnionDelete,
                 ChangeData = JsonSerializer.Serialize(union, JsonDefaults.Options),
-                Reason = "普通用户提交删除婚姻单元申请"
+                Reason = "修谱员提交删除婚姻单元申请"
             }, currentUserId);
 
             return Ok(ApiResponse.OK(new WorkflowResultDto
             {
                 SubmittedForReview = true,
                 TaskId = taskId,
-                Message = "删除婚姻单元申请已提交，等待审核"
+                Message = "删除婚姻单元申请已提交，等待树拥有者或树管理员审核"
             }));
         }
 
@@ -197,13 +202,14 @@ namespace 家谱.Controllers
         {
             var tree = await _treeService.GetByIdAsync(dto.TreeId) ?? throw new KeyNotFoundException("家谱树不存在");
             var currentUserId = GetCurrentUserId();
+            var access = await _treePermissionService.GetTreeAccessAsync(dto.TreeId, currentUserId);
 
-            if (!await _treePermissionService.CanViewTreeAsync(tree, currentUserId))
+            if (!access.CanView)
             {
-                throw new UnauthorizedAccessException("无权访问此资源");
+                throw new UnauthorizedAccessException("无权访问该资源");
             }
 
-            if (GetCurrentUserRole() == (byte)RoleType.SuperAdmin || await _treePermissionService.CanEditTreeAsync(dto.TreeId, currentUserId))
+            if (access.CanDirectEdit)
             {
                 var relation = await _unionService.AddMemberAsync(dto, currentUserId);
                 return Ok(ApiResponse.OK(new WorkflowResultDto
@@ -212,6 +218,11 @@ namespace 家谱.Controllers
                     Message = "家庭子女关联添加成功",
                     Data = new { relation.UnionID, relation.MemberID }
                 }));
+            }
+
+            if (!access.CanSubmitChange)
+            {
+                throw new UnauthorizedAccessException("当前身份不允许提交家庭子女关联变更申请");
             }
 
             var child = await _memberService.GetByIdAsync(dto.MemberId) ?? throw new KeyNotFoundException("目标成员不存在");
@@ -234,7 +245,7 @@ namespace 家谱.Controllers
                     RelTypeName = ReviewActions.GetUnionMemberRelationDisplayName(dto.RelType),
                     dto.ChildOrder
                 }, JsonDefaults.Options),
-                Reason = "普通用户提交新增家庭子女关联申请",
+                Reason = "修谱员提交新增家庭子女关联申请",
                 ForceCreateTask = true
             }, currentUserId);
 
@@ -242,7 +253,7 @@ namespace 家谱.Controllers
             {
                 SubmittedForReview = true,
                 TaskId = taskId,
-                Message = "新增家庭子女关联申请已提交，等待审核"
+                Message = "新增家庭子女关联申请已提交，等待树拥有者或树管理员审核"
             }));
         }
 
@@ -256,13 +267,14 @@ namespace 家谱.Controllers
             var tree = await _treeService.GetByIdAsync(union.TreeId) ?? throw new KeyNotFoundException("家谱树不存在");
             var child = await _memberService.GetByIdAsync(memberId) ?? throw new KeyNotFoundException("目标成员不存在");
             var currentUserId = GetCurrentUserId();
+            var access = await _treePermissionService.GetTreeAccessAsync(union.TreeId, currentUserId);
 
-            if (!await _treePermissionService.CanViewTreeAsync(tree, currentUserId))
+            if (!access.CanView)
             {
-                throw new UnauthorizedAccessException("无权访问此资源");
+                throw new UnauthorizedAccessException("无权访问该资源");
             }
 
-            if (GetCurrentUserRole() == (byte)RoleType.SuperAdmin || await _treePermissionService.CanEditTreeAsync(union.TreeId, currentUserId))
+            if (access.CanDirectEdit)
             {
                 var success = await _unionService.RemoveMemberAsync(unionId, memberId, currentUserId);
                 if (!success)
@@ -275,6 +287,11 @@ namespace 家谱.Controllers
                     AppliedDirectly = true,
                     Message = "家庭子女关联删除成功"
                 }));
+            }
+
+            if (!access.CanSubmitChange)
+            {
+                throw new UnauthorizedAccessException("当前身份不允许提交家庭子女关联删除申请");
             }
 
             var taskId = await _reviewService.SubmitAsync(new SubmitReviewRequest
@@ -291,14 +308,14 @@ namespace 家谱.Controllers
                     MemberId = memberId,
                     ChildName = $"{child.LastName}{child.FirstName}"
                 }, JsonDefaults.Options),
-                Reason = "普通用户提交删除家庭子女关联申请"
+                Reason = "修谱员提交删除家庭子女关联申请"
             }, currentUserId);
 
             return Ok(ApiResponse.OK(new WorkflowResultDto
             {
                 SubmittedForReview = true,
                 TaskId = taskId,
-                Message = "删除家庭子女关联申请已提交，等待审核"
+                Message = "删除家庭子女关联申请已提交，等待树拥有者或树管理员审核"
             }));
         }
 
@@ -317,17 +334,6 @@ namespace 家谱.Controllers
         {
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             return Guid.TryParse(userIdClaim, out var userId) ? userId : null;
-        }
-
-        private byte GetCurrentUserRole()
-        {
-            var roleClaim = User.FindFirst(ClaimTypes.Role)?.Value;
-            if (!byte.TryParse(roleClaim, out var role))
-            {
-                throw new UnauthorizedAccessException("无法解析当前用户角色");
-            }
-
-            return role;
         }
     }
 }

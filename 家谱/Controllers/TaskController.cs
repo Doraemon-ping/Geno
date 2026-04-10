@@ -7,6 +7,9 @@ using 家谱.Services;
 
 namespace 家谱.Controllers
 {
+    /// <summary>
+    /// 审核任务控制器。
+    /// </summary>
     [Authorize]
     [ApiController]
     [Route("api/[controller]")]
@@ -24,6 +27,22 @@ namespace 家谱.Controllers
         {
             var userId = GetCurrentUserId();
             var tasks = await _reviewService.GetTaskList(userId);
+            return Ok(ApiResponse.OK(tasks));
+        }
+
+        [HttpGet("my-submissions")]
+        public async Task<ActionResult> GetMySubmissions([FromQuery] int page = 1, [FromQuery] int pageSize = 20, [FromQuery] byte? status = null)
+        {
+            var userId = GetCurrentUserId();
+            var tasks = await _reviewService.QueryMySubmissionsAsync(userId, page, pageSize, status);
+            return Ok(ApiResponse.OK(tasks));
+        }
+
+        [HttpGet("review-history")]
+        public async Task<ActionResult> GetReviewHistory([FromQuery] int page = 1, [FromQuery] int pageSize = 20, [FromQuery] byte? status = null)
+        {
+            var userId = GetCurrentUserId();
+            var tasks = await _reviewService.QueryReviewHistoryAsync(userId, page, pageSize, status);
             return Ok(ApiResponse.OK(tasks));
         }
 
@@ -47,7 +66,9 @@ namespace 家谱.Controllers
         {
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (!Guid.TryParse(userIdClaim, out var userId))
+            {
                 throw new UnauthorizedAccessException("无法解析当前用户身份");
+            }
 
             return userId;
         }

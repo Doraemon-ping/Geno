@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using 家谱.Models.DTOs;
 using 家谱.Models.DTOs.Common;
 using 家谱.Services;
 
@@ -22,7 +23,18 @@ namespace 家谱.Controllers
         }
 
         /// <summary>
-        /// 获取数据库操作日志。
+        /// 分页查询数据库日志，支持按表名、操作类型、操作人和时间范围筛选。
+        /// </summary>
+        [HttpGet("query")]
+        public async Task<IActionResult> Query([FromQuery] DataLogQueryDto query)
+        {
+            var userId = GetCurrentUserId();
+            var result = await _auditLogService.QueryLogsAsync(userId, query);
+            return Ok(ApiResponse.OK(result));
+        }
+
+        /// <summary>
+        /// 兼容旧版日志列表接口。
         /// </summary>
         [HttpGet("list")]
         public async Task<IActionResult> GetList([FromQuery] int take = 100)

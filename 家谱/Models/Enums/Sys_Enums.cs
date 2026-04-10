@@ -23,7 +23,7 @@ namespace 家谱.Models.Enums
     }
 
     /// <summary>
-    /// 树内权限角色枚举。
+    /// 树内角色枚举。
     /// </summary>
     public enum TreeRoleType : byte
     {
@@ -94,7 +94,7 @@ namespace 家谱.Models.Enums
         public static string GetRoleDisplayName(byte roleType) => roleType switch
         {
             (byte)RoleType.SuperAdmin => "超级管理员",
-            (byte)RoleType.Admin => "管理员",
+            (byte)RoleType.Admin => "系统管理员",
             (byte)RoleType.Editor => "修谱员",
             _ => "访客"
         };

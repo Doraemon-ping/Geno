@@ -27,39 +27,78 @@ namespace 家谱.DB
             modelBuilder.Entity<SysUser>(entity =>
             {
                 entity.ToTable("Sys_Users");
-                entity.HasKey(e => e.UserID);
-                entity.HasIndex(e => e.Username).IsUnique();
-                entity.HasIndex(e => e.Email).IsUnique();
-                entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+                entity.HasKey(item => item.UserID);
+                entity.HasIndex(item => item.Username).IsUnique();
+                entity.HasIndex(item => item.Email).IsUnique();
+                entity.Property(item => item.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
             });
 
-            modelBuilder.Entity<GenoTree>()
-                .HasMany(t => t.Poems)
-                .WithOne()
-                .HasForeignKey("TreeID");
+            modelBuilder.Entity<GenoTree>(entity =>
+            {
+                entity.HasMany(tree => tree.Poems)
+                    .WithOne()
+                    .HasForeignKey("TreeID");
 
-            modelBuilder.Entity<GenoTree>()
-                .HasQueryFilter(t => !t.IsDel);
+                entity.HasQueryFilter(tree => !tree.IsDel);
+                entity.HasIndex(tree => new { tree.OwnerID, tree.IsDel });
+                entity.HasIndex(tree => new { tree.IsPublic, tree.IsDel });
+            });
 
-            modelBuilder.Entity<GenoGenerationPoem>()
-                .HasQueryFilter(p => !p.IsDel);
+            modelBuilder.Entity<GenoGenerationPoem>(entity =>
+            {
+                entity.HasQueryFilter(poem => !poem.IsDel);
+                entity.HasIndex(poem => new { poem.TreeID, poem.GenerationNum });
+                entity.HasIndex(poem => new { poem.TreeID, poem.Word });
+            });
 
-            modelBuilder.Entity<GenoMember>()
-                .HasQueryFilter(m => m.IsDel != true);
+            modelBuilder.Entity<GenoMember>(entity =>
+            {
+                entity.HasQueryFilter(member => member.IsDel != true);
+                entity.HasIndex(member => new { member.TreeID, member.GenerationNum });
+                entity.HasIndex(member => new { member.TreeID, member.PoemID });
+                entity.HasIndex(member => new { member.TreeID, member.LastName, member.FirstName });
+                entity.HasIndex(member => new { member.TreeID, member.Gender, member.GenerationNum });
+                entity.HasIndex(member => new { member.TreeID, member.IsLiving, member.GenerationNum });
+                entity.HasIndex(member => new { member.TreeID, member.SysUserId });
+            });
 
-            modelBuilder.Entity<GenoUnion>()
-                .HasQueryFilter(union => !union.IsDel);
+            modelBuilder.Entity<GenoUnion>(entity =>
+            {
+                entity.HasQueryFilter(union => !union.IsDel);
+                entity.HasIndex(union => union.Partner1ID);
+                entity.HasIndex(union => union.Partner2ID);
+            });
 
             modelBuilder.Entity<GenoUnionMember>(entity =>
             {
                 entity.HasKey(item => new { item.UnionID, item.MemberID });
                 entity.HasQueryFilter(item => !item.IsDel);
                 entity.HasIndex(item => new { item.UnionID, item.ChildOrder });
+                entity.HasIndex(item => item.MemberID);
             });
 
-            modelBuilder.Entity<GenoTreePermission>()
-                .HasIndex(p => new { p.TreeID, p.UserID })
-                .IsUnique();
+            modelBuilder.Entity<GenoTreePermission>(entity =>
+            {
+                entity.HasIndex(item => new { item.TreeID, item.UserID }).IsUnique();
+                entity.HasIndex(item => new { item.UserID, item.IsActive });
+            });
+
+            modelBuilder.Entity<DataLog>(entity =>
+            {
+                entity.HasIndex(log => log.CreatedAt);
+                entity.HasIndex(log => new { log.TargetTable, log.CreatedAt });
+                entity.HasIndex(log => new { log.OpUser, log.CreatedAt });
+                entity.HasIndex(log => log.TargetID);
+                entity.HasIndex(log => log.TaskID);
+            });
+
+            modelBuilder.Entity<ReviewTask>(entity =>
+            {
+                entity.HasIndex(task => new { task.Status, task.CreatedAt });
+                entity.HasIndex(task => new { task.TreeID, task.Status, task.CreatedAt });
+                entity.HasIndex(task => new { task.ReviewerID, task.Status });
+                entity.HasIndex(task => new { task.SubmitterID, task.CreatedAt });
+            });
         }
     }
 }

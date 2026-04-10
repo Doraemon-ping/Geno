@@ -77,6 +77,8 @@
         public string ProcessTime { get; set; } = string.Empty;
 
         public bool CanProcess { get; set; }
+
+        public bool IsHistory { get; set; }
     }
 
     public class TaskProcessDto

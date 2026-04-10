@@ -12,19 +12,24 @@ namespace 家谱.Services
     public interface ITreePermissionService
     {
         /// <summary>
-        /// 获取指定用户对树的访问能力。
+        /// 获取指定用户在当前树上的权限能力。公开树支持匿名访问。
         /// </summary>
-        Task<TreeAccessDto> GetTreeAccessAsync(Guid treeId, Guid userId);
+        Task<TreeAccessDto> GetTreeAccessAsync(Guid treeId, Guid? userId);
 
         /// <summary>
         /// 判断用户是否可以查看树。
         /// </summary>
-        Task<bool> CanViewTreeAsync(GenoTree tree, Guid userId);
+        Task<bool> CanViewTreeAsync(GenoTree tree, Guid? userId);
 
         /// <summary>
-        /// 判断用户是否可以直接编辑树内容。
+        /// 判断用户是否可以直接修改树内容。
         /// </summary>
-        Task<bool> CanEditTreeAsync(Guid treeId, Guid userId);
+        Task<bool> CanDirectEditTreeAsync(Guid treeId, Guid userId);
+
+        /// <summary>
+        /// 判断用户是否可以提交树内修改申请。
+        /// </summary>
+        Task<bool> CanSubmitTreeChangeAsync(Guid treeId, Guid userId);
 
         /// <summary>
         /// 判断用户是否可以审核任务。
@@ -37,7 +42,7 @@ namespace 家谱.Services
         Task<List<TreePermissionDto>> GetPermissionsAsync(Guid treeId);
 
         /// <summary>
-        /// 新增或更新树内权限。
+        /// 新增或更新树权限。
         /// </summary>
         Task<GenoTreePermission> UpsertPermissionAsync(Guid treeId, Guid userId, byte roleType, Guid? grantedBy);
 
@@ -59,54 +64,88 @@ namespace 家谱.Services
             _db = db;
         }
 
-        public async Task<TreeAccessDto> GetTreeAccessAsync(Guid treeId, Guid userId)
+        public async Task<TreeAccessDto> GetTreeAccessAsync(Guid treeId, Guid? userId)
         {
-            var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.UserID == userId && u.UserStatus == 1)
-                ?? throw new Exception("用户不存在");
-
-            var tree = await _db.GenoTrees.AsNoTracking().FirstOrDefaultAsync(t => t.TreeID == treeId && !t.IsDel)
+            var tree = await _db.GenoTrees
+                .AsNoTracking()
+                .FirstOrDefaultAsync(item => item.TreeID == treeId && !item.IsDel)
                 ?? throw new Exception("家谱树不存在");
 
+            if (!userId.HasValue)
+            {
+                return BuildVisitorAccess(tree, false);
+            }
+
+            var user = await _db.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(item => item.UserID == userId.Value && item.UserStatus == 1)
+                ?? throw new Exception("用户不存在");
+
             var isSuperAdmin = user.RoleType == (byte)RoleType.SuperAdmin;
-            var isOwner = tree.OwnerID == userId;
+            var isSystemAdmin = user.RoleType == (byte)RoleType.Admin;
+            var isOwner = tree.OwnerID == user.UserID;
 
             byte? roleType = null;
             if (!isOwner)
             {
                 roleType = await _db.TreePermissions
                     .AsNoTracking()
-                    .Where(permission => permission.TreeID == treeId && permission.UserID == userId && permission.IsActive)
+                    .Where(permission =>
+                        permission.TreeID == treeId &&
+                        permission.UserID == user.UserID &&
+                        permission.IsActive)
                     .Select(permission => (byte?)permission.RoleType)
                     .FirstOrDefaultAsync();
             }
 
+            var canView = isSuperAdmin || tree.IsPublic || isOwner || roleType.HasValue;
+            var canDirectEdit = isSuperAdmin || isOwner || roleType == (byte)TreeRoleType.Admin;
+            var canSubmitChange = canDirectEdit || roleType == (byte)TreeRoleType.Editor;
+            var canReview = isSuperAdmin || isOwner || roleType == (byte)TreeRoleType.Admin;
+            var canManagePermissions = isSuperAdmin || isOwner || roleType == (byte)TreeRoleType.Admin;
+
             return new TreeAccessDto
             {
                 IsSuperAdmin = isSuperAdmin,
+                IsSystemAdmin = isSystemAdmin,
                 IsOwner = isOwner,
                 RoleType = isOwner ? (byte)TreeRoleType.Admin : roleType,
                 RoleName = GetTreeRoleName(isSuperAdmin, isOwner, roleType),
-                CanEdit = isSuperAdmin || isOwner || roleType is (byte)TreeRoleType.Admin or (byte)TreeRoleType.Editor,
-                CanReview = isSuperAdmin || isOwner || roleType == (byte)TreeRoleType.Admin,
-                CanManagePermissions = isSuperAdmin || isOwner || roleType == (byte)TreeRoleType.Admin
+                CanView = canView,
+                CanSubmitChange = canSubmitChange,
+                CanDirectEdit = canDirectEdit,
+                CanEdit = canDirectEdit,
+                CanReview = canReview,
+                CanManagePermissions = canManagePermissions
             };
         }
 
-        public async Task<bool> CanViewTreeAsync(GenoTree tree, Guid userId)
+        public async Task<bool> CanViewTreeAsync(GenoTree tree, Guid? userId)
         {
             if (tree.IsPublic)
             {
                 return true;
             }
 
-            var access = await GetTreeAccessAsync(tree.TreeID, userId);
-            return access.IsSuperAdmin || access.IsOwner || access.RoleType.HasValue;
+            if (!userId.HasValue)
+            {
+                return false;
+            }
+
+            var access = await GetTreeAccessAsync(tree.TreeID, userId.Value);
+            return access.CanView;
         }
 
-        public async Task<bool> CanEditTreeAsync(Guid treeId, Guid userId)
+        public async Task<bool> CanDirectEditTreeAsync(Guid treeId, Guid userId)
         {
             var access = await GetTreeAccessAsync(treeId, userId);
-            return access.CanEdit;
+            return access.CanDirectEdit;
+        }
+
+        public async Task<bool> CanSubmitTreeChangeAsync(Guid treeId, Guid userId)
+        {
+            var access = await GetTreeAccessAsync(treeId, userId);
+            return access.CanSubmitChange;
         }
 
         public async Task<bool> CanReviewTaskAsync(ReviewTask task, Guid userId)
@@ -136,6 +175,11 @@ namespace 家谱.Services
             }
 
             var access = await GetTreeAccessAsync(task.TreeID.Value, userId);
+            if (!access.CanView)
+            {
+                return false;
+            }
+
             if (task.ActionCode == ReviewActions.TreeApplyRole)
             {
                 return access.CanManagePermissions;
@@ -146,7 +190,9 @@ namespace 家谱.Services
 
         public async Task<List<TreePermissionDto>> GetPermissionsAsync(Guid treeId)
         {
-            var tree = await _db.GenoTrees.AsNoTracking().FirstOrDefaultAsync(t => t.TreeID == treeId && !t.IsDel)
+            var tree = await _db.GenoTrees
+                .AsNoTracking()
+                .FirstOrDefaultAsync(item => item.TreeID == treeId && !item.IsDel)
                 ?? throw new Exception("家谱树不存在");
 
             var permissions = await _db.TreePermissions
@@ -167,7 +213,10 @@ namespace 家谱.Services
                 })
                 .ToListAsync();
 
-            var owner = await _db.Users.AsNoTracking().FirstOrDefaultAsync(user => user.UserID == tree.OwnerID && user.UserStatus == 1);
+            var owner = await _db.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(user => user.UserID == tree.OwnerID && user.UserStatus == 1);
+
             if (owner != null && permissions.All(permission => permission.UserId != owner.UserID))
             {
                 permissions.Insert(0, new TreePermissionDto
@@ -264,6 +313,25 @@ namespace 家谱.Services
             }
 
             return trees;
+        }
+
+        private static TreeAccessDto BuildVisitorAccess(GenoTree tree, bool isSystemAdmin)
+        {
+            var canView = tree.IsPublic;
+            return new TreeAccessDto
+            {
+                IsSuperAdmin = false,
+                IsSystemAdmin = isSystemAdmin,
+                IsOwner = false,
+                RoleType = null,
+                RoleName = "访客",
+                CanView = canView,
+                CanSubmitChange = false,
+                CanDirectEdit = false,
+                CanEdit = false,
+                CanReview = false,
+                CanManagePermissions = false
+            };
         }
 
         private static string GetTreeRoleName(bool isSuperAdmin, bool isOwner, byte? roleType)

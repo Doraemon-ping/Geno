@@ -816,6 +816,17 @@
             const result = await requestJson("/api/Account/profile", { headers: authHeaders() });
             const profile = result.data || result.Data;
             state.profile = profile;
+            if (!document.getElementById("myApplicationsEntry")) {
+                const row = document.querySelector(".button-row");
+                if (row) {
+                    const link = document.createElement("a");
+                    link.id = "myApplicationsEntry";
+                    link.className = "ghost-button";
+                    link.href = "my-applications.html";
+                    link.textContent = "我的申请";
+                    row.appendChild(link);
+                }
+            }
 
             document.getElementById("heroTitle").textContent = `${profile.username} · 宗务总览`;
             document.getElementById("heroSubtitle").textContent = `当前角色为 ${profile.roleName}，你可以在此维护资料、申请权限，并查看审核记录。`;
@@ -912,6 +923,118 @@
                 setMessage("applyMessage", error.message);
             }
         }
+
+        async function loadMyTasks() {
+            try {
+                const [allResult, pendingResult] = await Promise.all([
+                    requestJson("/api/Task/my-submissions?page=1&pageSize=1", { headers: authHeaders() }),
+                    requestJson("/api/Task/my-submissions?page=1&pageSize=1&status=0", { headers: authHeaders() })
+                ]);
+
+                const allData = allResult.data || allResult.Data || {};
+                const pendingData = pendingResult.data || pendingResult.Data || {};
+                const totalCount = Number(allData.totalCount || allData.TotalCount || 0);
+                const pendingCount = Number(pendingData.totalCount || pendingData.TotalCount || 0);
+
+                document.getElementById("taskCountSummary").textContent = String(totalCount);
+                document.getElementById("pendingCountSummary").textContent = String(pendingCount);
+                document.getElementById("taskList").innerHTML = `
+                    <article class="task-card">
+                        <div class="task-header">
+                            <strong>我的申请</strong>
+                            <span class="status-badge">${totalCount} 条记录</span>
+                        </div>
+                        <div class="task-meta">
+                            <span>待审核申请：${pendingCount} 条</span>
+                            <span>你提交过的系统权限、树权限和内容变更申请已集中到独立页面。</span>
+                        </div>
+                        <div class="button-row">
+                            <a class="ghost-button" href="my-applications.html">打开我的申请</a>
+                        </div>
+                    </article>
+                `;
+            } catch (error) {
+                document.getElementById("taskList").innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`;
+            }
+        }
+
+        function ensureProfileLink(id, text, href, containerSelector) {
+            if (document.getElementById(id)) {
+                return document.getElementById(id);
+            }
+
+            const container = document.querySelector(containerSelector);
+            if (!container) {
+                return null;
+            }
+
+            const link = document.createElement("a");
+            link.id = id;
+            link.className = "ghost-button";
+            link.href = href;
+            link.textContent = text;
+            container.appendChild(link);
+            return link;
+        }
+
+        const __originalLoadProfile = loadProfile;
+        loadProfile = async function () {
+            await __originalLoadProfile();
+
+            ensureProfileLink("myApplicationsEntry", "我的申请", "my-applications.html", ".button-row");
+
+            if (state.profile && Number(state.profile.roleType) <= 1) {
+                const auditNav = document.getElementById("auditNav");
+                const auditEntry = document.getElementById("auditEntry");
+                if (auditNav) {
+                    auditNav.href = "review-tasks.html";
+                    auditNav.textContent = "审核任务";
+                }
+                if (auditEntry) {
+                    auditEntry.href = "review-tasks.html";
+                    auditEntry.textContent = "进入审核任务";
+                    auditEntry.style.display = "inline-flex";
+                }
+
+                ensureProfileLink("dataLogsEntry", "数据库日志", "data-logs.html", ".content-grid .button-row:last-child");
+            }
+        };
+
+        loadReviewTasks = async function () {
+            if (!state.profile || Number(state.profile.roleType) > 1) {
+                return;
+            }
+
+            let pendingCount = 0;
+            try {
+                const result = await requestJson("/api/Task/get-all", {
+                    method: "POST",
+                    headers: authHeaders()
+                });
+                const tasks = Array.isArray(result.data || result.Data) ? (result.data || result.Data) : [];
+                pendingCount = tasks.length;
+            } catch {
+                pendingCount = 0;
+            }
+
+            document.getElementById("reviewSection").style.display = "block";
+            document.getElementById("reviewTaskList").innerHTML = `
+                <article class="task-card">
+                    <div class="task-header">
+                        <strong>审核工作台</strong>
+                        <span class="status-badge">${pendingCount} 条待办</span>
+                    </div>
+                    <div class="task-meta">
+                        <span>审核任务与数据库日志已拆分为两个独立页面。</span>
+                        <span>你可以分别进入审核任务页和数据库日志页进行处理与检索。</span>
+                    </div>
+                    <div class="button-row">
+                        <a class="ghost-button" href="review-tasks.html">打开审核任务</a>
+                        <a class="ghost-button" href="data-logs.html">打开数据库日志</a>
+                    </div>
+                </article>
+            `;
+        };
 
         document.getElementById("saveProfileBtn").addEventListener("click", saveProfile);
         document.getElementById("applyBtn").addEventListener("click", submitApply);

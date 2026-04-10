@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using 家谱.Models.DTOs.Common;
 using 家谱.Common;
 using 家谱.DB;
 using 家谱.Models.DTOs;
@@ -19,6 +20,10 @@ namespace 家谱.Services
         Task<WorkflowResultDto> ProcessAsync(TaskProcessDto dto, Guid reviewerId);
 
         Task<List<TaskDtos>> GetTaskList(Guid userId);
+
+        Task<PagedResult<TaskDtos>> QueryMySubmissionsAsync(Guid userId, int page = 1, int pageSize = 20, byte? status = null);
+
+        Task<PagedResult<TaskDtos>> QueryReviewHistoryAsync(Guid userId, int page = 1, int pageSize = 20, byte? status = null);
 
         Task<List<TaskDtos>> GetAll(Guid userId);
     }
@@ -202,6 +207,96 @@ namespace 家谱.Services
         /// <summary>
         /// 获取当前用户可处理的待审核任务。
         /// </summary>
+        public async Task<PagedResult<TaskDtos>> QueryMySubmissionsAsync(Guid userId, int page = 1, int pageSize = 20, byte? status = null)
+        {
+            var userExists = await _db.Users.AnyAsync(user => user.UserID == userId && user.UserStatus == 1);
+            if (!userExists)
+            {
+                throw new KeyNotFoundException("用户不存在");
+            }
+
+            var currentPage = Math.Max(page, 1);
+            var currentPageSize = Math.Clamp(pageSize, 1, 100);
+
+            var query = _db.ReviewTasks
+                .AsNoTracking()
+                .Where(task => task.SubmitterID == userId);
+
+            if (status.HasValue)
+            {
+                query = query.Where(task => task.Status == status.Value);
+            }
+
+            var totalCount = await query.CountAsync();
+            var tasks = await query
+                .OrderByDescending(task => task.CreatedAt)
+                .Skip((currentPage - 1) * currentPageSize)
+                .Take(currentPageSize)
+                .ToListAsync();
+
+            var items = new List<TaskDtos>(tasks.Count);
+            foreach (var task in tasks)
+            {
+                items.Add(await MapTaskDtoAsync(task, userId));
+            }
+
+            return new PagedResult<TaskDtos>
+            {
+                Items = items,
+                Page = currentPage,
+                PageSize = currentPageSize,
+                TotalCount = totalCount,
+                TotalPages = totalCount == 0 ? 0 : (int)Math.Ceiling(totalCount / (double)currentPageSize)
+            };
+        }
+
+        public async Task<PagedResult<TaskDtos>> QueryReviewHistoryAsync(Guid userId, int page = 1, int pageSize = 20, byte? status = null)
+        {
+            var user = await _db.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(item => item.UserID == userId && item.UserStatus == 1);
+
+            if (user == null)
+            {
+                throw new KeyNotFoundException("当前用户不存在");
+            }
+
+            var currentPage = Math.Max(page, 1);
+            var currentPageSize = Math.Clamp(pageSize, 1, 100);
+
+            var query = _db.ReviewTasks
+                .AsNoTracking()
+                .Where(task => task.ReviewerID == userId && task.Status != (byte)ReviewStatus.Pending);
+
+            if (status.HasValue)
+            {
+                query = query.Where(task => task.Status == status.Value);
+            }
+
+            var totalCount = await query.CountAsync();
+            var tasks = await query
+                .OrderByDescending(task => task.ProcessedAt ?? task.CreatedAt)
+                .ThenByDescending(task => task.CreatedAt)
+                .Skip((currentPage - 1) * currentPageSize)
+                .Take(currentPageSize)
+                .ToListAsync();
+
+            var items = new List<TaskDtos>(tasks.Count);
+            foreach (var task in tasks)
+            {
+                items.Add(await MapTaskDtoAsync(task, userId));
+            }
+
+            return new PagedResult<TaskDtos>
+            {
+                Items = items,
+                Page = currentPage,
+                PageSize = currentPageSize,
+                TotalCount = totalCount,
+                TotalPages = totalCount == 0 ? 0 : (int)Math.Ceiling(totalCount / (double)currentPageSize)
+            };
+        }
+
         public async Task<List<TaskDtos>> GetAll(Guid userId)
         {
             var user = await _db.Users
@@ -326,7 +421,8 @@ namespace 家谱.Services
                 ReviewNotes = task.ReviewNotes ?? string.Empty,
                 CreateTime = task.CreatedAt.ToString("yyyy-MM-dd HH:mm"),
                 ProcessTime = task.ProcessedAt?.ToString("yyyy-MM-dd HH:mm") ?? "待处理",
-                CanProcess = canProcess
+                CanProcess = canProcess,
+                IsHistory = task.Status != (byte)ReviewStatus.Pending
             };
         }
 
@@ -552,11 +648,10 @@ namespace 家谱.Services
                 return null;
             }
 
-            var partnerIds = new[] { union.Partner1ID, union.Partner2ID };
             var partners = await _db.GenoMembers
                 .IgnoreQueryFilters()
                 .AsNoTracking()
-                .Where(member => partnerIds.Contains(member.MemberID))
+                .Where(member => member.MemberID == union.Partner1ID || member.MemberID == union.Partner2ID)
                 .ToListAsync();
 
             var partner1 = partners.FirstOrDefault(member => member.MemberID == union.Partner1ID);
@@ -607,18 +702,16 @@ namespace 家谱.Services
 
         private static object BuildTaskLogSnapshot(ReviewTask task) => new
         {
-            task.TaskID,
-            task.TreeID,
-            task.SubmitterID,
-            task.ActionCode,
-            task.TargetID,
+            taskId = task.TaskID,
+            treeId = task.TreeID,
+            actionCode = task.ActionCode,
+            actionName = ReviewActions.GetDisplayName(task.ActionCode),
             changeData = DeserializeJson(task.ChangeData) ?? new { },
-            task.Status,
-            task.ReviewerID,
-            task.ReviewNotes,
-            task.ApplyReason,
-            task.CreatedAt,
-            task.ProcessedAt
+            status = task.Status,
+            reviewNotes = task.ReviewNotes,
+            applyReason = task.ApplyReason,
+            createdAt = task.CreatedAt,
+            processedAt = task.ProcessedAt
         };
 
         private static object? DeserializeJson(string json)
