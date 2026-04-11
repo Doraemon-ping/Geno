@@ -36,6 +36,29 @@ namespace 家谱.Models.DTOs
         public string? Biography { get; set; }
 
         public Guid? SysUserId { get; set; }
+
+        public List<Guid> MediaIds { get; set; } = new();
+    }
+
+    public class MemberMediaUpdateDto
+    {
+        [Required]
+        public List<Guid> MediaIds { get; set; } = new();
+    }
+
+    /// <summary>
+    /// 申请把系统账号绑定到家谱成员。
+    /// </summary>
+    public class MemberIdentifyApplyDto
+    {
+        [Required]
+        public Guid TreeId { get; set; }
+
+        [Required]
+        public Guid MemberId { get; set; }
+
+        [MaxLength(500)]
+        public string Reason { get; set; } = string.Empty;
     }
 
     /// <summary>

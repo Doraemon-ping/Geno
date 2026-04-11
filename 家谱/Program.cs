@@ -2,6 +2,7 @@ using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Serilog;
@@ -54,13 +55,19 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
 builder.Services.AddMemoryCache();
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("JwtSettings"));
 builder.Services.Configure<MailSettings>(builder.Configuration.GetSection("MailSettings"));
+builder.Services.Configure<MediaStorageSettings>(builder.Configuration.GetSection("MediaStorage"));
 
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
+builder.Services.AddScoped<IMediaFileService, MediaFileService>();
 builder.Services.AddScoped<IGenoMemberService, GenoMemberService>();
 builder.Services.AddScoped<IGenoPoemService, GenoPoemService>();
 builder.Services.AddScoped<IGenoTreeService, GenoTreeService>();
 builder.Services.AddScoped<IGenoUnionService, GenoUnionService>();
+builder.Services.AddScoped<IGenoEventService, GenoEventService>();
+builder.Services.AddScoped<ICommentService, CommentService>();
+builder.Services.AddScoped<ISpacePostService, SpacePostService>();
+builder.Services.AddScoped<IAnnouncementService, AnnouncementService>();
 builder.Services.AddScoped<IUnionGraphService, UnionGraphService>();
 builder.Services.AddScoped<ITreePermissionService, TreePermissionService>();
 builder.Services.AddScoped<IReviewService, ReviewService>();
@@ -130,6 +137,10 @@ builder.Services.AddAuthentication(options =>
 
 var app = builder.Build();
 
+var mediaStorageSettings = app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<MediaStorageSettings>>().Value;
+var mediaRootPath = mediaStorageSettings.ResolveRootPath(app.Environment.ContentRootPath);
+Directory.CreateDirectory(mediaRootPath);
+
 using (var scope = app.Services.CreateScope())
 {
     var schemaInitializer = scope.ServiceProvider.GetRequiredService<IDatabaseSchemaInitializer>();
@@ -150,6 +161,11 @@ if (app.Environment.IsDevelopment())
 app.UseCors("AllowAll");
 app.UseDefaultFiles();
 app.UseStaticFiles();
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(mediaRootPath),
+    RequestPath = string.IsNullOrWhiteSpace(mediaStorageSettings.RequestPath) ? "/file" : mediaStorageSettings.RequestPath
+});
 app.UseHttpsRedirection();
 app.UseRouting();
 app.UseAuthentication();

@@ -31,11 +31,16 @@ namespace 家谱.Services
     {
         private readonly GenealogyDbContext _db;
         private readonly IAuditLogService _auditLogService;
+        private readonly IMediaFileService _mediaFileService;
 
-        public GenoMemberService(GenealogyDbContext db, IAuditLogService auditLogService)
+        public GenoMemberService(
+            GenealogyDbContext db,
+            IAuditLogService auditLogService,
+            IMediaFileService mediaFileService)
         {
             _db = db;
             _auditLogService = auditLogService;
+            _mediaFileService = mediaFileService;
         }
 
         public async Task<List<GenoMember>> GetByTreeIdAsync(Guid treeId)
@@ -182,6 +187,7 @@ namespace 家谱.Services
 
             _db.GenoMembers.Add(member);
             await _db.SaveChangesAsync();
+            await _mediaFileService.SyncMemberMediaAsync(member.MemberID, member.TreeID, dto.MediaIds, operatorUserId, taskId);
 
             await _auditLogService.WriteAsync(
                 "Geno_Members",
@@ -200,6 +206,7 @@ namespace 家谱.Services
                     member.BirthDateRaw,
                     member.Biography,
                     member.SysUserId,
+                    mediaCount = dto.MediaIds.Count,
                     member.IsDel
                 },
                 taskId);
@@ -233,6 +240,7 @@ namespace 家谱.Services
             member.SysUserId = dto.SysUserId;
 
             await _db.SaveChangesAsync();
+            await _mediaFileService.SyncMemberMediaAsync(member.MemberID, member.TreeID, dto.MediaIds, operatorUserId, taskId);
 
             await _auditLogService.WriteAsync(
                 "Geno_Members",
@@ -240,7 +248,7 @@ namespace 家谱.Services
                 "UPDATE",
                 operatorUserId,
                 before,
-                BuildMemberLogSnapshot(member),
+                BuildMemberLogSnapshot(member, mediaCount: dto.MediaIds.Count),
                 taskId);
 
             return true;
@@ -296,6 +304,7 @@ namespace 家谱.Services
             }
 
             await _db.SaveChangesAsync();
+            await _mediaFileService.SoftDeleteByOwnerAsync("member", member.MemberID, operatorUserId, taskId);
 
             await _auditLogService.WriteAsync(
                 "Geno_Members",
@@ -309,7 +318,7 @@ namespace 家谱.Services
             return true;
         }
 
-        private static object BuildMemberLogSnapshot(GenoMember member, int childRelationCount = 0, int partnerUnionCount = 0) => new
+        private static object BuildMemberLogSnapshot(GenoMember member, int childRelationCount = 0, int partnerUnionCount = 0, int mediaCount = 0) => new
         {
             member.MemberID,
             member.TreeID,
@@ -324,6 +333,7 @@ namespace 家谱.Services
             member.IsLiving,
             member.Biography,
             member.SysUserId,
+            mediaCount,
             member.IsDel,
             childRelationCount,
             partnerUnionCount

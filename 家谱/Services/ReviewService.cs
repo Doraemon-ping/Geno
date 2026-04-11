@@ -37,17 +37,20 @@ namespace 家谱.Services
         private readonly IHandleTasks _handler;
         private readonly ITreePermissionService _treePermissionService;
         private readonly IAuditLogService _auditLogService;
+        private readonly IMediaFileService _mediaFileService;
 
         public ReviewService(
             GenealogyDbContext db,
             IHandleTasks handleTasks,
             ITreePermissionService treePermissionService,
-            IAuditLogService auditLogService)
+            IAuditLogService auditLogService,
+            IMediaFileService mediaFileService)
         {
             _db = db;
             _handler = handleTasks;
             _treePermissionService = treePermissionService;
             _auditLogService = auditLogService;
+            _mediaFileService = mediaFileService;
         }
 
         /// <summary>
@@ -141,6 +144,10 @@ namespace 家谱.Services
                 else
                 {
                     task.Status = (byte)ReviewStatus.Rejected;
+                    if (task.ActionCode is ReviewActions.EventCreate or ReviewActions.EventUpdate)
+                    {
+                        await _mediaFileService.MarkRejectedAsync(task.TaskID, reviewerId);
+                    }
                 }
 
                 task.ReviewerID = reviewerId;
@@ -365,6 +372,9 @@ namespace 家谱.Services
                 case ReviewActions.MemberDelete:
                     await _handler.HandleMemberDeleteAsync(task, reviewerId);
                     break;
+                case ReviewActions.MemberIdentify:
+                    await _handler.HandleMemberIdentifyAsync(task, reviewerId);
+                    break;
                 case ReviewActions.UnionCreate:
                     await _handler.HandleUnionCreateAsync(task, reviewerId);
                     break;
@@ -376,6 +386,15 @@ namespace 家谱.Services
                     break;
                 case ReviewActions.UnionMemberDelete:
                     await _handler.HandleUnionMemberDeleteAsync(task, reviewerId);
+                    break;
+                case ReviewActions.EventCreate:
+                    await _handler.HandleEventCreateAsync(task, reviewerId);
+                    break;
+                case ReviewActions.EventUpdate:
+                    await _handler.HandleEventUpdateAsync(task, reviewerId);
+                    break;
+                case ReviewActions.EventDelete:
+                    await _handler.HandleEventDeleteAsync(task, reviewerId);
                     break;
                 default:
                     throw new InvalidOperationException($"未定义的业务操作：{task.ActionCode}");
@@ -437,11 +456,14 @@ namespace 家谱.Services
                 ReviewActions.PoemCreate => BuildPoemSummaryFromPayload(changeData),
                 ReviewActions.PoemUpdate => await BuildPoemSummaryAsync(task.TargetID) ?? BuildPoemSummaryFromPayload(changeData),
                 ReviewActions.PoemDelete => BuildPoemSummaryFromPayload(changeData) ?? await BuildPoemSummaryAsync(task.TargetID),
-                ReviewActions.MemberCreate or ReviewActions.MemberUpdate or ReviewActions.MemberDelete
+                ReviewActions.MemberCreate or ReviewActions.MemberUpdate or ReviewActions.MemberDelete or ReviewActions.MemberIdentify
                     => await BuildMemberSummaryAsync(task.TargetID) ?? BuildMemberSummaryFromPayload(changeData),
                 ReviewActions.UnionCreate => BuildUnionSummaryFromPayload(changeData),
                 ReviewActions.UnionDelete => await BuildUnionSummaryAsync(task.TargetID) ?? BuildUnionSummaryFromPayload(changeData),
                 ReviewActions.UnionMemberAdd or ReviewActions.UnionMemberDelete => await BuildMemberSummaryAsync(task.TargetID) ?? BuildMemberSummaryFromPayload(changeData),
+                ReviewActions.EventCreate => await BuildEventSummaryFromPayloadAsync(changeData),
+                ReviewActions.EventUpdate => await BuildEventSummaryAsync(task.TargetID) ?? await BuildEventSummaryFromPayloadAsync(changeData),
+                ReviewActions.EventDelete => await BuildEventSummaryAsync(task.TargetID) ?? await BuildEventSummaryFromPayloadAsync(changeData),
                 _ => null
             };
         }
@@ -700,6 +722,158 @@ namespace 家谱.Services
             };
         }
 
+        private async Task<object?> BuildEventSummaryAsync(Guid? eventId)
+        {
+            if (eventId == null)
+            {
+                return null;
+            }
+
+            var entity = await _db.GenoEvents
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(item => item.EventID == eventId.Value);
+
+            if (entity == null)
+            {
+                return null;
+            }
+
+            var participants = await _db.GenoEventParticipants
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .Where(item => item.EventID == entity.EventID && !item.IsDel)
+                .ToListAsync();
+
+            var participantSummary = string.Empty;
+            if (participants.Count > 0)
+            {
+                var memberIds = participants.Select(item => item.MemberID).Distinct().ToList();
+                var members = await BuildGuidPredicateQuery(
+                        _db.GenoMembers.IgnoreQueryFilters().AsNoTracking(),
+                        item => item.MemberID,
+                        memberIds)
+                    .ToListAsync();
+
+                var memberMap = members.ToDictionary(item => item.MemberID);
+                participantSummary = string.Join("；", participants.Select(item =>
+                {
+                    var name = memberMap.TryGetValue(item.MemberID, out var member)
+                        ? $"{member.LastName}{member.FirstName}"
+                        : "未知成员";
+                    return string.IsNullOrWhiteSpace(item.RoleDescription) ? name : $"{name}（{item.RoleDescription}）";
+                }));
+            }
+
+            var mediaFiles = await _db.MediaFiles
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .Where(item => item.OwnerType == "event" && item.OwnerID == entity.EventID && !item.IsDel)
+                .OrderBy(item => item.SortOrder)
+                .ThenBy(item => item.CreatedAt)
+                .ToListAsync();
+
+            var mediaSummary = string.Join("；", mediaFiles.Select(BuildMediaDisplayText));
+
+            return new
+            {
+                eventId = entity.EventID,
+                treeId = entity.TreeID,
+                eventTitle = entity.EventTitle,
+                eventType = entity.EventType,
+                eventTypeName = ReviewActions.GetEventTypeDisplayName(entity.EventType),
+                entity.IsGlobal,
+                eventDate = entity.EventDate,
+                entity.DateRaw,
+                locationId = entity.LocationID,
+                entity.Description,
+                participantSummary,
+                participantCount = participants.Count,
+                mediaSummary,
+                mediaCount = mediaFiles.Count,
+                isDeleted = entity.IsDel
+            };
+        }
+
+        private async Task<object?> BuildEventSummaryFromPayloadAsync(object? payload)
+        {
+            var element = ToJsonElement(payload);
+            if (element == null)
+            {
+                return null;
+            }
+
+            var participantIds = ReadGuidList(element.Value, "participants", "Participants", "memberId", "MemberId");
+            var mediaIds = ReadGuidList(element.Value, "mediaIds", "MediaIds");
+
+            string participantSummary = string.Empty;
+            if (participantIds.Count > 0)
+            {
+                var members = await BuildGuidPredicateQuery(
+                        _db.GenoMembers.IgnoreQueryFilters().AsNoTracking(),
+                        item => item.MemberID,
+                        participantIds)
+                    .ToListAsync();
+
+                participantSummary = string.Join("；", members.Select(item => $"{item.LastName}{item.FirstName}"));
+            }
+
+            string mediaSummary = string.Empty;
+            if (mediaIds.Count > 0)
+            {
+                var mediaFiles = await BuildGuidPredicateQuery(
+                        _db.MediaFiles.IgnoreQueryFilters().AsNoTracking(),
+                        item => item.MediaID,
+                        mediaIds)
+                    .OrderBy(item => item.SortOrder)
+                    .ThenBy(item => item.CreatedAt)
+                    .ToListAsync();
+
+                mediaSummary = string.Join("；", mediaFiles.Select(BuildMediaDisplayText));
+            }
+
+            return new
+            {
+                eventId = ReadGuid(element.Value, "eventId", "EventID"),
+                treeId = ReadGuid(element.Value, "treeId", "TreeID"),
+                eventTitle = ReadString(element.Value, "eventTitle", "EventTitle"),
+                eventType = ReadInt(element.Value, "eventType", "EventType"),
+                eventTypeName = ReviewActions.GetEventTypeDisplayName((byte)(ReadInt(element.Value, "eventType", "EventType") ?? 0)),
+                isGlobal = ReadBool(element.Value, "isGlobal", "IsGlobal"),
+                eventDate = ReadString(element.Value, "eventDate", "EventDate"),
+                dateRaw = ReadString(element.Value, "dateRaw", "DateRaw"),
+                locationId = ReadGuid(element.Value, "locationId", "LocationID"),
+                description = ReadString(element.Value, "description", "Description"),
+                participantSummary,
+                participantCount = participantIds.Count,
+                mediaSummary,
+                mediaCount = mediaIds.Count,
+                isDeleted = ReadBool(element.Value, "isDel", "IsDel")
+            };
+        }
+
+        private static string BuildMediaDisplayText(SysMediaFile item)
+        {
+            if (!string.IsNullOrWhiteSpace(item.Caption))
+            {
+                return item.Caption!;
+            }
+
+            var mimeType = (item.MimeType ?? string.Empty).ToLowerInvariant();
+            var fileExt = (item.FileExt ?? string.Empty).ToLowerInvariant();
+            if (mimeType.StartsWith("image/") || fileExt is ".jpg" or ".jpeg" or ".png" or ".gif" or ".webp" or ".bmp")
+            {
+                return "图片资料";
+            }
+
+            if (mimeType.StartsWith("video/") || fileExt is ".mp4" or ".mov" or ".avi" or ".webm" or ".m4v")
+            {
+                return "视频资料";
+            }
+
+            return "文档资料";
+        }
+
         private static object BuildTaskLogSnapshot(ReviewTask task) => new
         {
             taskId = task.TaskID,
@@ -821,6 +995,66 @@ namespace 家谱.Services
             return null;
         }
 
+        private static List<Guid> ReadGuidList(JsonElement element, params string[] names)
+        {
+            foreach (var name in names)
+            {
+                if (!element.TryGetProperty(name, out var value) || value.ValueKind != JsonValueKind.Array)
+                {
+                    continue;
+                }
+
+                var result = new List<Guid>();
+                foreach (var item in value.EnumerateArray())
+                {
+                    if (item.ValueKind == JsonValueKind.Object)
+                    {
+                        foreach (var propertyName in names.Skip(2))
+                        {
+                            if (item.TryGetProperty(propertyName, out var propertyValue) && Guid.TryParse(propertyValue.ToString(), out var objectGuid))
+                            {
+                                result.Add(objectGuid);
+                                break;
+                            }
+                        }
+
+                        continue;
+                    }
+
+                    if (Guid.TryParse(item.ToString(), out var guid))
+                    {
+                        result.Add(guid);
+                    }
+                }
+
+                return result.Distinct().ToList();
+            }
+
+            return new List<Guid>();
+        }
+
+        private static IQueryable<TEntity> BuildGuidPredicateQuery<TEntity>(
+            IQueryable<TEntity> source,
+            System.Linq.Expressions.Expression<Func<TEntity, Guid>> selector,
+            IReadOnlyCollection<Guid> ids)
+        {
+            if (ids.Count == 0)
+            {
+                return source.Where(_ => false);
+            }
+
+            var parameter = selector.Parameters[0];
+            System.Linq.Expressions.Expression? body = null;
+            foreach (var id in ids)
+            {
+                var equals = System.Linq.Expressions.Expression.Equal(selector.Body, System.Linq.Expressions.Expression.Constant(id));
+                body = body == null ? equals : System.Linq.Expressions.Expression.OrElse(body, equals);
+            }
+
+            var predicate = System.Linq.Expressions.Expression.Lambda<Func<TEntity, bool>>(body!, parameter);
+            return source.Where(predicate);
+        }
+
         private static string GetTargetType(string actionCode) => actionCode switch
         {
             ReviewActions.ApplyAdmin => "system-user",
@@ -828,8 +1062,10 @@ namespace 家谱.Services
             ReviewActions.TreeCreate or ReviewActions.TreeUpdate or ReviewActions.TreeDelete => "tree",
             ReviewActions.PoemCreate or ReviewActions.PoemUpdate or ReviewActions.PoemDelete => "poem",
             ReviewActions.MemberCreate or ReviewActions.MemberUpdate or ReviewActions.MemberDelete => "member",
+            ReviewActions.MemberIdentify => "member-identify",
             ReviewActions.UnionCreate or ReviewActions.UnionDelete => "union",
             ReviewActions.UnionMemberAdd or ReviewActions.UnionMemberDelete => "union-member",
+            ReviewActions.EventCreate or ReviewActions.EventUpdate or ReviewActions.EventDelete => "event",
             _ => "unknown"
         };
     }

@@ -167,6 +167,75 @@ namespace 家谱.Controllers
             }));
         }
 
+        /// <summary>
+        /// 申请认领家谱成员，审核通过后绑定 Geno_Members.SysUserId。
+        /// </summary>
+        [HttpPost("apply-tree-member")]
+        public async Task<IActionResult> ApplyTreeMember([FromBody] MemberIdentifyApplyDto dto)
+        {
+            var currentUserId = GetCurrentUserId();
+            if (dto.TreeId == Guid.Empty || dto.MemberId == Guid.Empty)
+            {
+                throw new ArgumentException("目标家谱树和树成员不能为空");
+            }
+
+            var tree = await _db.GenoTrees
+                .AsNoTracking()
+                .FirstOrDefaultAsync(item => item.TreeID == dto.TreeId && !item.IsDel)
+                ?? throw new KeyNotFoundException("家谱树不存在");
+
+            if (!tree.IsPublic)
+            {
+                throw new UnauthorizedAccessException("私有树不允许访客直接申请成为树成员，请联系树拥有者或管理员");
+            }
+
+            var member = await _db.GenoMembers
+                .AsNoTracking()
+                .FirstOrDefaultAsync(item => item.MemberID == dto.MemberId && item.TreeID == dto.TreeId && item.IsDel != true)
+                ?? throw new KeyNotFoundException("树成员不存在");
+
+            if (member.SysUserId == currentUserId)
+            {
+                throw new InvalidOperationException("当前账号已经绑定到该树成员，无需重复申请");
+            }
+
+            if (member.SysUserId.HasValue && member.SysUserId.Value != currentUserId)
+            {
+                throw new InvalidOperationException("该树成员已绑定其他系统用户");
+            }
+
+            var alreadyBound = await _db.GenoMembers
+                .AsNoTracking()
+                .AnyAsync(item =>
+                    item.TreeID == dto.TreeId &&
+                    item.MemberID != dto.MemberId &&
+                    item.SysUserId == currentUserId &&
+                    item.IsDel != true);
+
+            if (alreadyBound)
+            {
+                throw new InvalidOperationException("当前账号已经绑定到该家谱树的其他成员");
+            }
+
+            var taskId = await _reviewService.SubmitAsync(new SubmitReviewRequest
+            {
+                TreeId = dto.TreeId,
+                TargetId = dto.MemberId,
+                ActionCode = ReviewActions.MemberIdentify,
+                ChangeData = JsonSerializer.Serialize(dto, JsonDefaults.Options),
+                Reason = string.IsNullOrWhiteSpace(dto.Reason)
+                    ? "申请认领树成员并成为该家谱树成员"
+                    : dto.Reason.Trim()
+            }, currentUserId);
+
+            return Ok(ApiResponse.OK(new WorkflowResultDto
+            {
+                SubmittedForReview = true,
+                TaskId = taskId,
+                Message = "树成员认领申请已提交，等待树拥有者或树管理员审核"
+            }));
+        }
+
         private Guid GetCurrentUserId()
         {
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;

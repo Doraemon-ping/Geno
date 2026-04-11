@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>系统通知公告 - 赵氏家谱</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/announcements.css">
+    <link rel="stylesheet" href="css/ui-polish.css">
+</head>
+<body>
+    <nav class="navbar">
+        <a class="logo" href="index.html">赵氏家谱</a>
+        <div class="nav-links">
+            <a href="index.html">首页</a>
+            <a href="public.html">公开谱录</a>
+            <a href="announcements.html" class="active">通知公告</a>
+            <a href="profile.html" id="profileNav" style="display:none">个人中心</a>
+            <button id="logoutBtn" style="display:none" type="button">退出</button>
+            <a href="login.html" id="loginNav">登录</a>
+        </div>
+    </nav>
+
+    <header class="hero">
+        <div>
+            <span class="eyebrow">System Notice</span>
+            <h1>系统通知公告</h1>
+            <p>这里发布平台维护、功能更新、族务协作等系统级通知。系统管理员可直接发布，无需审核。</p>
+        </div>
+    </header>
+
+    <main class="page">
+        <section id="adminPanel" class="panel admin-panel hidden">
+            <div class="section-head">
+                <div>
+                    <span class="eyebrow">Admin</span>
+                    <h2 id="editorTitle">发布公告</h2>
+                </div>
+                <button id="resetBtn" class="ghost-button" type="button">新建公告</button>
+            </div>
+            <div id="adminMessage" class="message"></div>
+            <div class="form-grid">
+                <div class="field wide">
+                    <label for="titleInput">公告标题</label>
+                    <input id="titleInput" type="text" maxlength="200" placeholder="例如：系统升级维护通知">
+                </div>
+                <div class="field">
+                    <label for="categoryInput">公告分类</label>
+                    <input id="categoryInput" type="text" maxlength="50" value="系统公告">
+                </div>
+                <div class="field">
+                    <label for="statusInput">发布状态</label>
+                    <select id="statusInput">
+                        <option value="1">立即发布</option>
+                        <option value="0">保存草稿</option>
+                    </select>
+                </div>
+                <label class="check-field">
+                    <input id="pinnedInput" type="checkbox">
+                    <span>置顶展示</span>
+                </label>
+                <div class="field wide">
+                    <label for="contentInput">公告内容</label>
+                    <textarea id="contentInput" placeholder="请输入公告正文，支持换行展示。"></textarea>
+                </div>
+            </div>
+            <div class="actions">
+                <button id="saveBtn" class="action-button" type="button">发布/保存公告</button>
+                <button id="deleteBtn" class="danger-button hidden" type="button">删除公告</button>
+            </div>
+        </section>
+
+        <section class="panel">
+            <div class="section-head">
+                <div>
+                    <span class="eyebrow">Notice Board</span>
+                    <h2>公告列表</h2>
+                </div>
+                <div class="filter-row">
+                    <input id="keywordInput" type="search" placeholder="搜索公告标题或内容">
+                    <button id="searchBtn" class="ghost-button" type="button">搜索</button>
+                </div>
+            </div>
+            <div id="announcementList" class="notice-list">
+                <div class="empty">正在读取公告...</div>
+            </div>
+            <div class="pager">
+                <button id="prevBtn" class="ghost-button" type="button">上一页</button>
+                <span id="pageInfo">第 1 页</span>
+                <button id="nextBtn" class="ghost-button" type="button">下一页</button>
+            </div>
+        </section>
+    </main>
+
+    <script src="js/announcements.js"></script>
+</body>
+</html>

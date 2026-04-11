@@ -211,6 +211,26 @@
         }
 
         /// <summary>
+        /// 上传当前登录用户头像，前端会先完成缩放裁剪。
+        /// </summary>
+        [Authorize]
+        [HttpPost("avatar/upload")]
+        [RequestSizeLimit(10 * 1024 * 1024)]
+        public async Task<IActionResult> UploadAvatar([FromForm] IFormFile file)
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                           ?? User.FindFirst("sub")?.Value;
+
+            if (!Guid.TryParse(userIdClaim, out var userId))
+            {
+                throw new Exception("无法解析用户 ID");
+            }
+
+            var avatarUrl = await _authService.UploadAvatarAsync(userId, file);
+            return Ok(ApiResponse.OK(new { avatarUrl }));
+        }
+
+        /// <summary>
         /// The ForgotPasswordCode
         /// </summary>
         /// <param name="email">The email<see cref="string"/></param>

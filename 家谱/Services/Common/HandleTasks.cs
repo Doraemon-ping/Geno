@@ -37,6 +37,8 @@ namespace 家谱.Services.Common
 
         Task HandleMemberDeleteAsync(ReviewTask task, Guid reviewerId);
 
+        Task HandleMemberIdentifyAsync(ReviewTask task, Guid reviewerId);
+
         Task HandleUnionCreateAsync(ReviewTask task, Guid reviewerId);
 
         Task HandleUnionDeleteAsync(ReviewTask task, Guid reviewerId);
@@ -44,6 +46,12 @@ namespace 家谱.Services.Common
         Task HandleUnionMemberAddAsync(ReviewTask task, Guid reviewerId);
 
         Task HandleUnionMemberDeleteAsync(ReviewTask task, Guid reviewerId);
+
+        Task HandleEventCreateAsync(ReviewTask task, Guid reviewerId);
+
+        Task HandleEventUpdateAsync(ReviewTask task, Guid reviewerId);
+
+        Task HandleEventDeleteAsync(ReviewTask task, Guid reviewerId);
     }
 
     /// <summary>
@@ -56,6 +64,7 @@ namespace 家谱.Services.Common
         private readonly IGenoPoemService _poemService;
         private readonly IGenoMemberService _memberService;
         private readonly IGenoUnionService _unionService;
+        private readonly IGenoEventService _eventService;
         private readonly ITreePermissionService _treePermissionService;
         private readonly IAuditLogService _auditLogService;
 
@@ -65,6 +74,7 @@ namespace 家谱.Services.Common
             IGenoPoemService poemService,
             IGenoMemberService memberService,
             IGenoUnionService unionService,
+            IGenoEventService eventService,
             ITreePermissionService treePermissionService,
             IAuditLogService auditLogService)
         {
@@ -73,6 +83,7 @@ namespace 家谱.Services.Common
             _poemService = poemService;
             _memberService = memberService;
             _unionService = unionService;
+            _eventService = eventService;
             _treePermissionService = treePermissionService;
             _auditLogService = auditLogService;
         }
@@ -258,6 +269,66 @@ namespace 家谱.Services.Common
             }
         }
 
+        public async Task HandleMemberIdentifyAsync(ReviewTask task, Guid reviewerId)
+        {
+            var payload = JsonSerializer.Deserialize<MemberIdentifyApplyDto>(task.ChangeData, JsonDefaults.Options)
+                ?? throw new InvalidOperationException("无效的成员认领申请数据");
+
+            var targetUserId = task.SubmitterID;
+            var member = await _db.GenoMembers
+                .FirstOrDefaultAsync(item => item.MemberID == payload.MemberId && item.TreeID == payload.TreeId && item.IsDel != true)
+                ?? throw new KeyNotFoundException("树成员不存在");
+
+            if (member.SysUserId.HasValue && member.SysUserId.Value != targetUserId)
+            {
+                throw new InvalidOperationException("该树成员已绑定其他系统用户");
+            }
+
+            var alreadyBound = await _db.GenoMembers
+                .AsNoTracking()
+                .AnyAsync(item =>
+                    item.TreeID == payload.TreeId &&
+                    item.MemberID != payload.MemberId &&
+                    item.SysUserId == targetUserId &&
+                    item.IsDel != true);
+
+            if (alreadyBound)
+            {
+                throw new InvalidOperationException("当前账号已经绑定到该家谱树的其他成员");
+            }
+
+            var before = new
+            {
+                member.MemberID,
+                member.TreeID,
+                member.LastName,
+                member.FirstName,
+                member.SysUserId
+            };
+
+            member.SysUserId = targetUserId;
+            await _db.SaveChangesAsync();
+
+            task.TreeID = payload.TreeId;
+            task.TargetID = member.MemberID;
+
+            await _auditLogService.WriteAsync(
+                "Geno_Members",
+                member.MemberID,
+                "UPDATE",
+                reviewerId,
+                before,
+                new
+                {
+                    member.MemberID,
+                    member.TreeID,
+                    member.LastName,
+                    member.FirstName,
+                    member.SysUserId
+                },
+                task.TaskID);
+        }
+
         public async Task HandleUnionCreateAsync(ReviewTask task, Guid reviewerId)
         {
             var payload = JsonSerializer.Deserialize<GenoUnionDto>(task.ChangeData, JsonDefaults.Options)
@@ -304,6 +375,39 @@ namespace 家谱.Services.Common
 
             task.TreeID = payload.TreeId;
             task.TargetID = payload.MemberId;
+        }
+
+        public async Task HandleEventCreateAsync(ReviewTask task, Guid reviewerId)
+        {
+            var payload = JsonSerializer.Deserialize<GenoEventDto>(task.ChangeData, JsonDefaults.Options)
+                ?? throw new InvalidOperationException("无效的历史事件数据");
+
+            var entity = await _eventService.CreateAsync(payload, reviewerId, task.TaskID);
+            task.TreeID = entity.TreeID;
+            task.TargetID = entity.EventID;
+        }
+
+        public async Task HandleEventUpdateAsync(ReviewTask task, Guid reviewerId)
+        {
+            var payload = JsonSerializer.Deserialize<GenoEventDto>(task.ChangeData, JsonDefaults.Options)
+                ?? throw new InvalidOperationException("无效的历史事件更新数据");
+
+            var eventId = task.TargetID ?? throw new InvalidOperationException("缺少目标历史事件");
+            var success = await _eventService.UpdateAsync(eventId, payload, reviewerId, task.TaskID);
+            if (!success)
+            {
+                throw new KeyNotFoundException("历史事件不存在");
+            }
+        }
+
+        public async Task HandleEventDeleteAsync(ReviewTask task, Guid reviewerId)
+        {
+            var eventId = task.TargetID ?? throw new InvalidOperationException("缺少目标历史事件");
+            var success = await _eventService.DeleteAsync(eventId, reviewerId, task.TaskID);
+            if (!success)
+            {
+                throw new KeyNotFoundException("历史事件不存在");
+            }
         }
 
         private static string NormalizeUnionPayload(string changeData)

@@ -1,7 +1,7 @@
 namespace 家谱.Models.Enums
 {
     /// <summary>
-    /// 审核任务状态枚举。
+    /// 审核任务状态。
     /// </summary>
     public enum ReviewStatus : byte
     {
@@ -12,7 +12,7 @@ namespace 家谱.Models.Enums
     }
 
     /// <summary>
-    /// 系统用户角色枚举。
+    /// 系统用户角色。
     /// </summary>
     public enum RoleType : byte
     {
@@ -23,7 +23,7 @@ namespace 家谱.Models.Enums
     }
 
     /// <summary>
-    /// 树内角色枚举。
+    /// 树内角色。
     /// </summary>
     public enum TreeRoleType : byte
     {
@@ -32,12 +32,37 @@ namespace 家谱.Models.Enums
     }
 
     /// <summary>
-    /// 审核处理动作枚举。
+    /// 审核处理动作。
     /// </summary>
     public enum ReviewProcessAction : byte
     {
         Approve = 1,
         Reject = 2
+    }
+
+    /// <summary>
+    /// 历史事件类型。
+    /// </summary>
+    public enum GenoEventType : byte
+    {
+        Birth = 1,
+        Death = 2,
+        Migration = 3,
+        War = 4,
+        Honor = 5,
+        Education = 6
+    }
+
+    /// <summary>
+    /// 媒体文件状态。
+    /// </summary>
+    public enum MediaFileStatus : byte
+    {
+        Temp = 0,
+        Pending = 1,
+        Approved = 2,
+        Rejected = 3,
+        Archived = 4
     }
 
     /// <summary>
@@ -54,13 +79,16 @@ namespace 家谱.Models.Enums
         public const string PoemUpdate = "Poem.Update";
         public const string PoemDelete = "Poem.Delete";
         public const string MemberCreate = "Member.Create";
+        public const string MemberUpdate = "Member.Update";
+        public const string MemberDelete = "Member.Delete";
+        public const string MemberIdentify = "Member.Identify";
         public const string UnionCreate = "Union.Create";
         public const string UnionDelete = "Union.Delete";
         public const string UnionMemberAdd = "UnionMember.Add";
         public const string UnionMemberDelete = "UnionMember.Delete";
-        public const string MemberUpdate = "Member.Update";
-        public const string MemberDelete = "Member.Delete";
-        public const string MemberIdentify = "Member.Identify";
+        public const string EventCreate = "Event.Create";
+        public const string EventUpdate = "Event.Update";
+        public const string EventDelete = "Event.Delete";
         public const string MediaUpload = "Media.Upload";
 
         /// <summary>
@@ -77,13 +105,16 @@ namespace 家谱.Models.Enums
             PoemUpdate => "修改字辈",
             PoemDelete => "删除字辈",
             MemberCreate => "新增树成员",
+            MemberUpdate => "修改树成员",
+            MemberDelete => "删除树成员",
+            MemberIdentify => "认领树成员",
             UnionCreate => "新增婚姻单元",
             UnionDelete => "删除婚姻单元",
             UnionMemberAdd => "新增家庭子女关联",
             UnionMemberDelete => "删除家庭子女关联",
-            MemberUpdate => "修改树成员",
-            MemberDelete => "删除树成员",
-            MemberIdentify => "认领树成员",
+            EventCreate => "新增历史事件",
+            EventUpdate => "修改历史事件",
+            EventDelete => "删除历史事件",
             MediaUpload => "上传资料",
             _ => actionCode
         };
@@ -130,6 +161,33 @@ namespace 家谱.Models.Enums
             3 => "继子",
             4 => "过继",
             _ => "未知关系"
+        };
+
+        /// <summary>
+        /// 获取事件类型名称。
+        /// </summary>
+        public static string GetEventTypeDisplayName(byte eventType) => eventType switch
+        {
+            (byte)GenoEventType.Birth => "出生",
+            (byte)GenoEventType.Death => "逝世",
+            (byte)GenoEventType.Migration => "迁徙",
+            (byte)GenoEventType.War => "战争",
+            (byte)GenoEventType.Honor => "荣誉",
+            (byte)GenoEventType.Education => "教育",
+            _ => "未知类型"
+        };
+
+        /// <summary>
+        /// 获取媒体状态名称。
+        /// </summary>
+        public static string GetMediaStatusDisplayName(byte status) => status switch
+        {
+            (byte)MediaFileStatus.Temp => "临时上传",
+            (byte)MediaFileStatus.Pending => "待审核",
+            (byte)MediaFileStatus.Approved => "已通过",
+            (byte)MediaFileStatus.Rejected => "已驳回",
+            (byte)MediaFileStatus.Archived => "已归档",
+            _ => "未知状态"
         };
     }
 }

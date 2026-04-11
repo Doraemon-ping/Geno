@@ -1,5 +1,7 @@
 ﻿namespace 家谱.Services
 {
+    using Microsoft.AspNetCore.Hosting;
+    using Microsoft.AspNetCore.Http;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.Extensions.Caching.Memory;
     using Microsoft.Extensions.Options;
@@ -80,6 +82,11 @@
         /// 搜索系统用户。
         /// </summary>
         Task<List<UserLookupDto>> SearchUsersAsync(string? keyword, int take = 10);
+
+        /// <summary>
+        /// 上传并更新当前用户头像。
+        /// </summary>
+        Task<string> UploadAvatarAsync(Guid userId, IFormFile file);
     }
 
     /// <summary>
@@ -112,6 +119,10 @@
         /// </summary>
         private readonly IAuditLogService _auditLogService;
 
+        private readonly IWebHostEnvironment _environment;
+
+        private readonly MediaStorageSettings _mediaStorageSettings;
+
         /// <summary>
         /// Initializes a new instance of the <see cref="AuthService"/> class.
         /// </summary>
@@ -123,13 +134,17 @@
                             IMailService mailService,
                             IMemoryCache cache,
                             IAuditLogService auditLogService,
-                            IOptions<JwtSettings> settings)
+                            IOptions<JwtSettings> settings,
+                            IWebHostEnvironment environment,
+                            IOptions<MediaStorageSettings> mediaStorageSettings)
         {
             _context = context;
             _mailService = mailService;
             _cache = cache;
             _auditLogService = auditLogService;
             _jwtSettings = settings.Value; // 2. 通过构造函数注入配置对象
+            _environment = environment;
+            _mediaStorageSettings = mediaStorageSettings.Value;
         }
 
         //注册
@@ -318,6 +333,7 @@
                     Username = u.Username,
                     Email = u.Email,
                     Phone = u.Phone,
+                    AvatarUrl = u.AvatarUrl,
                     RoleType = u.RoleType,
                     CreatedAt = u.CreatedAt
                 })
@@ -353,6 +369,7 @@
                     Username = user.Username,
                     Email = user.Email,
                     Phone = user.Phone,
+                    AvatarUrl = user.AvatarUrl,
                     RoleType = user.RoleType
                 })
                 .ToListAsync();
@@ -397,6 +414,7 @@
             if (!string.IsNullOrEmpty(dto.Username)) user.Username = dto.Username;
             if (!string.IsNullOrEmpty(dto.Phone)) user.Phone = dto.Phone;
             if (!string.IsNullOrEmpty(dto.Email)) user.Email = dto.Email;
+            user.AvatarUrl = string.IsNullOrWhiteSpace(dto.AvatarUrl) ? null : dto.AvatarUrl.Trim();
             user.UpdatedAt = DateTime.UtcNow;
 
             var changed = _context.Entry(user).Properties.Any(p => p.IsModified);
@@ -416,6 +434,65 @@
             }
 
             return (saved, "修改成功");
+        }
+
+        public async Task<string> UploadAvatarAsync(Guid userId, IFormFile file)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(item => item.UserID == userId && item.UserStatus == 1);
+            if (user == null)
+            {
+                throw new UnauthorizedAccessException("用户不存在或已被禁用");
+            }
+
+            if (file == null || file.Length <= 0)
+            {
+                throw new InvalidOperationException("请选择要上传的头像图片");
+            }
+
+            var extension = Path.GetExtension(file.FileName);
+            var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".jpg", ".jpeg", ".png", ".webp" };
+            if (string.IsNullOrWhiteSpace(extension) || !allowed.Contains(extension))
+            {
+                throw new InvalidOperationException("头像仅支持 JPG、PNG、WEBP 图片");
+            }
+
+            var maxBytes = Math.Min(Math.Max(_mediaStorageSettings.MaxFileSizeMb, 1), 10) * 1024L * 1024L;
+            if (file.Length > maxBytes)
+            {
+                throw new InvalidOperationException("头像图片不能超过 10MB");
+            }
+
+            var before = BuildUserSnapshot(user);
+            var monthFolder = DateTime.UtcNow.ToString("yyyyMM");
+            var relativeFolder = Path.Combine("avatars", monthFolder);
+            var physicalFolder = Path.Combine(_mediaStorageSettings.ResolveRootPath(_environment.ContentRootPath), relativeFolder);
+            Directory.CreateDirectory(physicalFolder);
+
+            var fileName = $"{userId:N}_{Guid.NewGuid():N}{extension.ToLowerInvariant()}";
+            var physicalPath = Path.Combine(physicalFolder, fileName);
+            await using (var stream = File.Create(physicalPath))
+            {
+                await file.CopyToAsync(stream);
+            }
+
+            var requestPath = string.IsNullOrWhiteSpace(_mediaStorageSettings.RequestPath)
+                ? "/file"
+                : "/" + _mediaStorageSettings.RequestPath.Trim().Trim('/');
+            var avatarUrl = $"{requestPath}/{relativeFolder.Replace("\\", "/")}/{fileName}";
+
+            user.AvatarUrl = avatarUrl;
+            user.UpdatedAt = DateTime.UtcNow;
+
+            await _auditLogService.WriteAsync(
+                "Sys_Users",
+                user.UserID,
+                "UPDATE",
+                userId,
+                before,
+                BuildUserSnapshot(user));
+
+            await _context.SaveChangesAsync();
+            return avatarUrl;
         }
 
         // 4. 发送重置密码验证码
@@ -476,6 +553,7 @@
                 user.Username,
                 user.Email,
                 user.Phone,
+                user.AvatarUrl,
                 user.RoleType,
                 user.UserStatus,
                 PasswordChanged = false

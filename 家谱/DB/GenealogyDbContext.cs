@@ -17,6 +17,12 @@ namespace 家谱.DB
         public DbSet<GenoMember> GenoMembers { get; set; } = null!;
         public DbSet<GenoUnion> GenoUnions { get; set; } = null!;
         public DbSet<GenoUnionMember> GenoUnionMembers { get; set; } = null!;
+        public DbSet<GenoEvent> GenoEvents { get; set; } = null!;
+        public DbSet<GenoEventParticipant> GenoEventParticipants { get; set; } = null!;
+        public DbSet<SysMediaFile> MediaFiles { get; set; } = null!;
+        public DbSet<GenoSpacePost> SpacePosts { get; set; } = null!;
+        public DbSet<GenoComment> GenoComments { get; set; } = null!;
+        public DbSet<SysAnnouncement> Announcements { get; set; } = null!;
         public DbSet<DataLog> DataLogs { get; set; } = null!;
         public DbSet<ReviewTask> ReviewTasks { get; set; } = null!;
 
@@ -75,6 +81,56 @@ namespace 家谱.DB
                 entity.HasQueryFilter(item => !item.IsDel);
                 entity.HasIndex(item => new { item.UnionID, item.ChildOrder });
                 entity.HasIndex(item => item.MemberID);
+            });
+
+            modelBuilder.Entity<GenoEvent>(entity =>
+            {
+                entity.HasQueryFilter(item => !item.IsDel);
+                entity.HasIndex(item => new { item.TreeID, item.IsGlobal, item.IsPublic, item.EventDate, item.IsDel });
+                entity.HasIndex(item => new { item.IsGlobal, item.EventDate, item.IsDel });
+                entity.HasIndex(item => new { item.EventType, item.EventDate });
+            });
+
+            modelBuilder.Entity<GenoEventParticipant>(entity =>
+            {
+                entity.HasKey(item => new { item.EventID, item.MemberID });
+                entity.HasQueryFilter(item => !item.IsDel);
+                entity.HasIndex(item => new { item.EventID, item.IsDel });
+                entity.HasIndex(item => item.MemberID);
+            });
+
+            modelBuilder.Entity<SysMediaFile>(entity =>
+            {
+                entity.HasQueryFilter(item => !item.IsDel);
+                entity.HasIndex(item => new { item.OwnerType, item.OwnerID, item.IsDel });
+                entity.HasIndex(item => new { item.TreeID, item.Status, item.CreatedAt });
+                entity.HasIndex(item => new { item.UploadUserID, item.CreatedAt });
+                entity.HasIndex(item => item.ReviewTaskID);
+                entity.HasIndex(item => item.HashValue);
+            });
+
+            modelBuilder.Entity<GenoSpacePost>(entity =>
+            {
+                entity.HasQueryFilter(item => !item.IsDel);
+                entity.HasIndex(item => new { item.TreeID, item.CreatedAt });
+                entity.HasIndex(item => new { item.UserID, item.CreatedAt });
+            });
+
+            modelBuilder.Entity<GenoComment>(entity =>
+            {
+                entity.HasQueryFilter(item => !item.IsDel);
+                entity.HasIndex(item => new { item.OwnerType, item.OwnerID, item.CreatedAt });
+                entity.HasIndex(item => new { item.ParentCommentID, item.CreatedAt });
+                entity.HasIndex(item => new { item.TreeID, item.CreatedAt });
+                entity.HasIndex(item => new { item.UserID, item.CreatedAt });
+            });
+
+            modelBuilder.Entity<SysAnnouncement>(entity =>
+            {
+                entity.HasQueryFilter(item => !item.IsDel);
+                entity.HasIndex(item => new { item.Status, item.IsPinned, item.PublishedAt, item.CreatedAt });
+                entity.HasIndex(item => new { item.Category, item.Status, item.CreatedAt });
+                entity.HasIndex(item => new { item.CreatedBy, item.CreatedAt });
             });
 
             modelBuilder.Entity<GenoTreePermission>(entity =>

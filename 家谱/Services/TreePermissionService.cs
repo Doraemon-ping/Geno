@@ -98,7 +98,12 @@ namespace 家谱.Services
                     .FirstOrDefaultAsync();
             }
 
-            var canView = isSuperAdmin || tree.IsPublic || isOwner || roleType.HasValue;
+            var isBoundMember = await _db.GenoMembers
+                .AsNoTracking()
+                .AnyAsync(member => member.TreeID == treeId && member.SysUserId == user.UserID && member.IsDel != true);
+
+            var canView = isSuperAdmin || tree.IsPublic || isOwner || roleType.HasValue || isBoundMember;
+            var isTreeMember = isSuperAdmin || isOwner || roleType.HasValue || isBoundMember;
             var canDirectEdit = isSuperAdmin || isOwner || roleType == (byte)TreeRoleType.Admin;
             var canSubmitChange = canDirectEdit || roleType == (byte)TreeRoleType.Editor;
             var canReview = isSuperAdmin || isOwner || roleType == (byte)TreeRoleType.Admin;
@@ -109,6 +114,7 @@ namespace 家谱.Services
                 IsSuperAdmin = isSuperAdmin,
                 IsSystemAdmin = isSystemAdmin,
                 IsOwner = isOwner,
+                IsTreeMember = isTreeMember,
                 RoleType = isOwner ? (byte)TreeRoleType.Admin : roleType,
                 RoleName = GetTreeRoleName(isSuperAdmin, isOwner, roleType),
                 CanView = canView,
@@ -169,6 +175,14 @@ namespace 家谱.Services
                 return reviewer.RoleType is (byte)RoleType.SuperAdmin or (byte)RoleType.Admin;
             }
 
+            if (task.ActionCode is ReviewActions.EventCreate or ReviewActions.EventUpdate or ReviewActions.EventDelete)
+            {
+                if (!task.TreeID.HasValue)
+                {
+                    return reviewer.RoleType is (byte)RoleType.SuperAdmin or (byte)RoleType.Admin;
+                }
+            }
+
             if (!task.TreeID.HasValue)
             {
                 return false;
@@ -180,7 +194,7 @@ namespace 家谱.Services
                 return false;
             }
 
-            if (task.ActionCode == ReviewActions.TreeApplyRole)
+            if (task.ActionCode is ReviewActions.TreeApplyRole or ReviewActions.MemberIdentify)
             {
                 return access.CanManagePermissions;
             }
@@ -323,6 +337,7 @@ namespace 家谱.Services
                 IsSuperAdmin = false,
                 IsSystemAdmin = isSystemAdmin,
                 IsOwner = false,
+                IsTreeMember = false,
                 RoleType = null,
                 RoleName = "访客",
                 CanView = canView,

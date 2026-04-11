@@ -49,6 +49,8 @@ namespace 家谱.Models.DTOs
 
         public bool IsOwner { get; set; }
 
+        public bool IsTreeMember { get; set; }
+
         public byte? RoleType { get; set; }
 
         public string RoleName { get; set; } = "访客";

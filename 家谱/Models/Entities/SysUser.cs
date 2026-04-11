@@ -23,6 +23,9 @@
         [StringLength(20)]
         public string? Phone { get; set; }
 
+        [StringLength(500)]
+        public string? AvatarUrl { get; set; }
+
         public byte RoleType { get; set; }
 
         public byte UserStatus { get; set; }

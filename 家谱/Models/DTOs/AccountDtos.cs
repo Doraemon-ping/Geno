@@ -97,6 +97,12 @@
         public string? Phone { get; set; }
 
         /// <summary>
+        /// 用户头像地址。
+        /// </summary>
+        [System.ComponentModel.DataAnnotations.StringLength(500)]
+        public string? AvatarUrl { get; set; }
+
+        /// <summary>
         /// Gets or sets the RoleType
         /// </summary>
         public byte RoleType { get; set; }
@@ -137,6 +143,12 @@
         /// Gets or sets the Email
         /// </summary>
         public string? Email { get; set; }
+
+        /// <summary>
+        /// 用户头像地址。
+        /// </summary>
+        [System.ComponentModel.DataAnnotations.StringLength(500)]
+        public string? AvatarUrl { get; set; }
     }
 
     /// <summary>
@@ -163,6 +175,11 @@
         /// 电话。
         /// </summary>
         public string? Phone { get; set; }
+
+        /// <summary>
+        /// 用户头像地址。
+        /// </summary>
+        public string? AvatarUrl { get; set; }
 
         /// <summary>
         /// 角色类型。
