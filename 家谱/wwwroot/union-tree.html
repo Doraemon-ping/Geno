@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>婚姻单元树 - 赵氏家谱平台</title>
+    <title>家谱图形化编排 - 赵氏家谱平台</title>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/union-tree.css">
   <link rel="stylesheet" href="css/ui-polish.css">
+  <link rel="stylesheet" href="css/union-tree.css">
 </head>
-<body>
+<body class="union-tree-page">
     <header class="navbar">
         <a class="logo" href="index.html">赵氏家谱</a>
         <nav class="nav">
@@ -20,8 +20,8 @@
 
     <section class="hero">
         <div>
-            <h1 id="pageTitle">婚姻单元树</h1>
-            <p id="pageSubtitle">以成员、婚姻单元和子女关系为主线展示整棵家谱树，适合上千上万人规模的分支浏览与关系定位。</p>
+            <h1 id="pageTitle">家谱图形化编排</h1>
+            <p id="pageSubtitle">以成员、婚姻单元和子女关系为主线展示整棵家谱树，点击节点即可把关系带入右侧编排台。</p>
         </div>
     </section>
 
@@ -47,7 +47,7 @@
                 </div>
             </div>
             <div class="controls">
-                <button class="btn" id="fitBtn" type="button">适应画布</button>
+                <button class="btn" id="fitBtn" type="button">适应高度</button>
                 <button class="btn-line" id="zoomInBtn" type="button">放大</button>
                 <button class="btn-line" id="zoomOutBtn" type="button">缩小</button>
                 <button class="btn-line" id="downloadSvgBtn" type="button">下载 SVG 图</button>
@@ -56,8 +56,8 @@
             <div class="message" id="message"></div>
         </section>
 
-        <section class="workspace">
-            <section class="panel">
+        <section class="workspace union-workspace">
+            <section class="panel graph-panel">
                 <div class="title">婚姻单元树图</div>
                 <div class="viewport" id="viewport">
                     <svg class="stage" id="stage" viewBox="0 0 1200 800" width="1200" height="800" aria-label="婚姻单元树图">
@@ -89,8 +89,8 @@
                     <strong>使用提示</strong>
                     <div>1. 鼠标拖拽可平移画布。</div>
                     <div>2. 滚轮或按钮可缩放。</div>
-                    <div>3. 点击节点可查看详细信息。</div>
-                    <div>4. 适合先整体浏览，再逐个定位分支。</div>
+                    <div>3. 点击成员可设为伴侣或子女。</div>
+                    <div>4. 点击婚姻单元可编辑家庭关系。</div>
                 </div>
 
                 <div class="side-card">
@@ -98,6 +98,85 @@
                     <div id="detailContent">点击左侧节点查看详细信息。</div>
                 </div>
             </aside>
+        </section>
+
+        <section id="editorPanel" class="panel editor-panel">
+            <div class="title">
+                <span>关系编排台</span>
+                <small id="roleName">访客</small>
+            </div>
+            <div id="editorHint" class="note">正在读取当前编辑权限...</div>
+
+            <div class="editor-grid">
+                <section class="editor-card">
+                    <div class="editor-card-title">1. 搜索并选取成员</div>
+                    <div class="field">
+                        <label for="memberKeyword">成员关键词</label>
+                        <input id="memberKeyword" type="text" placeholder="输入姓名、出生信息或简介关键字">
+                    </div>
+                    <button id="searchMemberBtn" class="btn-line" type="button">搜索成员</button>
+                    <div id="memberSearchResults" class="member-results"><div class="empty">输入关键词后搜索成员。</div></div>
+                </section>
+
+                <section class="editor-card">
+                    <div class="editor-card-title">2. 新增成员</div>
+                    <div class="mini-grid">
+                        <div class="field"><label for="newLastName">姓氏</label><input id="newLastName" type="text"></div>
+                        <div class="field"><label for="newFirstName">名字</label><input id="newFirstName" type="text"></div>
+                        <div class="field"><label for="newGeneration">代数</label><input id="newGeneration" type="number" min="1"></div>
+                        <div class="field"><label for="newGender">性别</label><select id="newGender"><option value="0">未知</option><option value="1">男</option><option value="2">女</option></select></div>
+                        <div class="field"><label for="newIsLiving">在世状态</label><select id="newIsLiving"><option value="true">在世</option><option value="false">已故</option></select></div>
+                        <div class="field"><label for="newBirthRaw">出生信息</label><input id="newBirthRaw" type="text" placeholder="例如：光绪三年"></div>
+                    </div>
+                    <div class="field"><label for="newBiography">简介</label><textarea id="newBiography" placeholder="生平、迁徙、职业或备注"></textarea></div>
+                    <div class="actions">
+                        <button id="createMemberBtn" class="btn" data-edit-action type="button">新增成员</button>
+                        <button id="clearMemberFormBtn" class="btn-line" type="button">清空</button>
+                    </div>
+                </section>
+
+                <section class="editor-card">
+                    <div class="editor-card-title">3. 婚姻单元</div>
+                    <input id="unionIdInput" type="hidden">
+                    <input id="partner1Id" type="hidden">
+                    <input id="partner2Id" type="hidden">
+                    <div class="selected-pairs">
+                        <div><span>伴侣 1</span><strong id="partner1Name">未选择</strong></div>
+                        <div><span>伴侣 2</span><strong id="partner2Name">未选择</strong></div>
+                    </div>
+                    <div class="field"><label for="unionPicker">已有婚姻单元</label><select id="unionPicker"><option value="">选择已有婚姻单元</option></select></div>
+                    <div class="mini-grid">
+                        <div class="field"><label for="unionTypeInput">婚姻类型</label><select id="unionTypeInput"><option value="1">正式结婚</option><option value="2">事实婚姻</option><option value="3">离异</option></select></div>
+                        <div class="field"><label for="sortOrderInput">婚姻排序</label><input id="sortOrderInput" type="number" min="1" value="1"></div>
+                        <div class="field"><label for="marriageDateInput">结婚日期</label><input id="marriageDateInput" type="date"></div>
+                    </div>
+                    <div class="actions">
+                        <button id="saveUnionBtn" class="btn" data-edit-action type="button">保存婚姻单元</button>
+                        <button id="deleteUnionBtn" class="danger" data-edit-action type="button">删除单元</button>
+                        <button id="clearUnionBtn" class="btn-line" type="button">新建模式</button>
+                    </div>
+                </section>
+
+                <section class="editor-card">
+                    <div class="editor-card-title">4. 子女关系</div>
+                    <input id="relationUnionId" type="hidden">
+                    <input id="childId" type="hidden">
+                    <div class="selected-pairs">
+                        <div><span>家庭单元</span><strong id="relationUnionName">未选择婚姻单元</strong></div>
+                        <div><span>子女成员</span><strong id="childName">未选择</strong></div>
+                    </div>
+                    <div class="mini-grid">
+                        <div class="field"><label for="relTypeInput">关系类型</label><select id="relTypeInput"><option value="1">亲生</option><option value="2">收养</option><option value="3">继子</option><option value="4">过继</option></select></div>
+                        <div class="field"><label for="childOrderInput">排行</label><input id="childOrderInput" type="number" min="1" value="1"></div>
+                    </div>
+                    <div class="actions">
+                        <button id="addChildBtn" class="btn" data-edit-action type="button">保存子女关系</button>
+                        <button id="removeChildBtn" class="danger" data-edit-action type="button">移除关系</button>
+                        <button id="quickParentsBtn" class="btn-line" data-edit-action type="button">父母子女一键串联</button>
+                    </div>
+                    <div class="helper">如果当前身份需要审核，建议先提交婚姻单元，审核通过后再提交子女关系；拥有者和树管理员可一键串联。</div>
+                </section>
+            </div>
         </section>
     </main>
 

@@ -378,6 +378,9 @@ namespace 家谱.Services
                 case ReviewActions.UnionCreate:
                     await _handler.HandleUnionCreateAsync(task, reviewerId);
                     break;
+                case ReviewActions.UnionUpdate:
+                    await _handler.HandleUnionUpdateAsync(task, reviewerId);
+                    break;
                 case ReviewActions.UnionDelete:
                     await _handler.HandleUnionDeleteAsync(task, reviewerId);
                     break;
@@ -459,7 +462,7 @@ namespace 家谱.Services
                 ReviewActions.MemberCreate or ReviewActions.MemberUpdate or ReviewActions.MemberDelete or ReviewActions.MemberIdentify
                     => await BuildMemberSummaryAsync(task.TargetID) ?? BuildMemberSummaryFromPayload(changeData),
                 ReviewActions.UnionCreate => BuildUnionSummaryFromPayload(changeData),
-                ReviewActions.UnionDelete => await BuildUnionSummaryAsync(task.TargetID) ?? BuildUnionSummaryFromPayload(changeData),
+                ReviewActions.UnionUpdate or ReviewActions.UnionDelete => await BuildUnionSummaryAsync(task.TargetID) ?? BuildUnionSummaryFromPayload(changeData),
                 ReviewActions.UnionMemberAdd or ReviewActions.UnionMemberDelete => await BuildMemberSummaryAsync(task.TargetID) ?? BuildMemberSummaryFromPayload(changeData),
                 ReviewActions.EventCreate => await BuildEventSummaryFromPayloadAsync(changeData),
                 ReviewActions.EventUpdate => await BuildEventSummaryAsync(task.TargetID) ?? await BuildEventSummaryFromPayloadAsync(changeData),
@@ -1063,7 +1066,7 @@ namespace 家谱.Services
             ReviewActions.PoemCreate or ReviewActions.PoemUpdate or ReviewActions.PoemDelete => "poem",
             ReviewActions.MemberCreate or ReviewActions.MemberUpdate or ReviewActions.MemberDelete => "member",
             ReviewActions.MemberIdentify => "member-identify",
-            ReviewActions.UnionCreate or ReviewActions.UnionDelete => "union",
+            ReviewActions.UnionCreate or ReviewActions.UnionUpdate or ReviewActions.UnionDelete => "union",
             ReviewActions.UnionMemberAdd or ReviewActions.UnionMemberDelete => "union-member",
             ReviewActions.EventCreate or ReviewActions.EventUpdate or ReviewActions.EventDelete => "event",
             _ => "unknown"

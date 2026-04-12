@@ -166,7 +166,10 @@ app.UseStaticFiles(new StaticFileOptions
     FileProvider = new PhysicalFileProvider(mediaRootPath),
     RequestPath = string.IsNullOrWhiteSpace(mediaStorageSettings.RequestPath) ? "/file" : mediaStorageSettings.RequestPath
 });
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();

@@ -142,6 +142,79 @@ namespace 家谱.Controllers
         }
 
         /// <summary>
+        /// 修改婚姻单元。
+        /// </summary>
+        [HttpPut("Update/{id}")]
+        public async Task<IActionResult> Update(Guid id, [FromBody] GenoUnionDto dto)
+        {
+            var union = await _unionService.GetByIdAsync(id) ?? throw new KeyNotFoundException("婚姻单元不存在");
+            if (union.TreeId != dto.TreeId)
+            {
+                throw new ArgumentException("不允许跨家谱树修改婚姻单元");
+            }
+
+            var tree = await _treeService.GetByIdAsync(dto.TreeId) ?? throw new KeyNotFoundException("家谱树不存在");
+            var currentUserId = GetCurrentUserId();
+            var access = await _treePermissionService.GetTreeAccessAsync(dto.TreeId, currentUserId);
+
+            if (!access.CanView)
+            {
+                throw new UnauthorizedAccessException("无权访问该资源");
+            }
+
+            if (access.CanDirectEdit)
+            {
+                var success = await _unionService.UpdateAsync(id, dto, currentUserId);
+                if (!success)
+                {
+                    throw new InvalidOperationException("婚姻单元修改失败");
+                }
+
+                return Ok(ApiResponse.OK(new WorkflowResultDto
+                {
+                    AppliedDirectly = true,
+                    Message = "婚姻单元修改成功"
+                }));
+            }
+
+            if (!access.CanSubmitChange)
+            {
+                throw new UnauthorizedAccessException("当前身份不允许提交婚姻单元变更申请");
+            }
+
+            var partner1 = await _memberService.GetByIdAsync(dto.Partner1Id) ?? throw new KeyNotFoundException("伴侣 1 不存在");
+            var partner2 = await _memberService.GetByIdAsync(dto.Partner2Id) ?? throw new KeyNotFoundException("伴侣 2 不存在");
+
+            var taskId = await _reviewService.SubmitAsync(new SubmitReviewRequest
+            {
+                TreeId = dto.TreeId,
+                TargetId = id,
+                ActionCode = ReviewActions.UnionUpdate,
+                ChangeData = JsonSerializer.Serialize(new
+                {
+                    dto.TreeId,
+                    UnionId = id,
+                    dto.Partner1Id,
+                    Partner1Name = $"{partner1.LastName}{partner1.FirstName}",
+                    dto.Partner2Id,
+                    Partner2Name = $"{partner2.LastName}{partner2.FirstName}",
+                    dto.UnionType,
+                    UnionTypeName = ReviewActions.GetUnionTypeDisplayName(dto.UnionType),
+                    dto.SortOrder,
+                    dto.MarriageDate
+                }, JsonDefaults.Options),
+                Reason = "修谱员提交修改婚姻单元申请"
+            }, currentUserId);
+
+            return Ok(ApiResponse.OK(new WorkflowResultDto
+            {
+                SubmittedForReview = true,
+                TaskId = taskId,
+                Message = "修改婚姻单元申请已提交，等待树拥有者或树管理员审核"
+            }));
+        }
+
+        /// <summary>
         /// 删除婚姻单元。
         /// </summary>
         [HttpDelete("Del/{id}")]

@@ -27,6 +27,11 @@ namespace 家谱.Services
         Task<GenoUnion> CreateAsync(GenoUnionDto dto, Guid operatorUserId, Guid? taskId = null);
 
         /// <summary>
+        /// 修改婚姻单元。
+        /// </summary>
+        Task<bool> UpdateAsync(Guid unionId, GenoUnionDto dto, Guid operatorUserId, Guid? taskId = null);
+
+        /// <summary>
         /// 逻辑删除婚姻单元。
         /// </summary>
         Task<bool> DeleteAsync(Guid unionId, Guid operatorUserId, Guid? taskId = null);
@@ -183,6 +188,67 @@ namespace 家谱.Services
                 taskId);
 
             return union;
+        }
+
+        public async Task<bool> UpdateAsync(Guid unionId, GenoUnionDto dto, Guid operatorUserId, Guid? taskId = null)
+        {
+            var union = await _db.GenoUnions
+                .FirstOrDefaultAsync(item => item.UnionID == unionId && !item.IsDel);
+
+            if (union == null)
+            {
+                return false;
+            }
+
+            var (partner1, partner2) = await ValidatePartnersAsync(dto.TreeId, dto.Partner1Id, dto.Partner2Id);
+            var exists = await _db.GenoUnions
+                .IgnoreQueryFilters()
+                .AnyAsync(item =>
+                    item.UnionID != unionId &&
+                    !item.IsDel &&
+                    item.Partner1ID == dto.Partner1Id &&
+                    item.Partner2ID == dto.Partner2Id &&
+                    item.SortOrder == dto.SortOrder);
+
+            if (exists)
+            {
+                throw new InvalidOperationException("该婚姻单元已存在，请勿重复修改");
+            }
+
+            var beforePartners = await _db.GenoMembers
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .Where(member => member.MemberID == union.Partner1ID || member.MemberID == union.Partner2ID)
+                .ToListAsync();
+            var beforePartnerMap = beforePartners.ToDictionary(member => member.MemberID);
+
+            if (!beforePartnerMap.TryGetValue(union.Partner1ID, out var beforePartner1) ||
+                !beforePartnerMap.TryGetValue(union.Partner2ID, out var beforePartner2))
+            {
+                throw new InvalidOperationException("婚姻单元数据不完整，无法修改");
+            }
+
+            var before = BuildUnionLogSnapshot(union, dto.TreeId, beforePartner1, beforePartner2);
+
+            union.Partner1ID = dto.Partner1Id;
+            union.Partner2ID = dto.Partner2Id;
+            union.UnionType = dto.UnionType;
+            union.SortOrder = dto.SortOrder <= 0 ? 1 : dto.SortOrder;
+            union.MarriageDate = dto.MarriageDate;
+            union.UpdatedAt = DateTime.UtcNow;
+
+            await _db.SaveChangesAsync();
+
+            await _auditLogService.WriteAsync(
+                "Geno_Unions",
+                union.UnionID,
+                "UPDATE",
+                operatorUserId,
+                before,
+                BuildUnionLogSnapshot(union, dto.TreeId, partner1, partner2),
+                taskId);
+
+            return true;
         }
 
         public async Task<bool> DeleteAsync(Guid unionId, Guid operatorUserId, Guid? taskId = null)

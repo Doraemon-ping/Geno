@@ -41,6 +41,8 @@ namespace 家谱.Services.Common
 
         Task HandleUnionCreateAsync(ReviewTask task, Guid reviewerId);
 
+        Task HandleUnionUpdateAsync(ReviewTask task, Guid reviewerId);
+
         Task HandleUnionDeleteAsync(ReviewTask task, Guid reviewerId);
 
         Task HandleUnionMemberAddAsync(ReviewTask task, Guid reviewerId);
@@ -338,6 +340,22 @@ namespace 家谱.Services.Common
             var union = await _unionService.CreateAsync(payload, reviewerId, task.TaskID);
             task.TreeID = payload.TreeId;
             task.TargetID = union.UnionID;
+        }
+
+        public async Task HandleUnionUpdateAsync(ReviewTask task, Guid reviewerId)
+        {
+            var payload = JsonSerializer.Deserialize<GenoUnionDto>(task.ChangeData, JsonDefaults.Options)
+                ?? JsonSerializer.Deserialize<GenoUnionDto>(NormalizeUnionPayload(task.ChangeData), JsonDefaults.Options)
+                ?? throw new InvalidOperationException("无效的婚姻单元数据");
+
+            var unionId = task.TargetID ?? throw new InvalidOperationException("缺少目标婚姻单元");
+            var success = await _unionService.UpdateAsync(unionId, payload, reviewerId, task.TaskID);
+            if (!success)
+            {
+                throw new KeyNotFoundException("婚姻单元不存在");
+            }
+
+            task.TreeID = payload.TreeId;
         }
 
         public async Task HandleUnionDeleteAsync(ReviewTask task, Guid reviewerId)

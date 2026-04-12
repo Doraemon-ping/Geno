@@ -83,6 +83,7 @@ namespace 家谱.Models.Enums
         public const string MemberDelete = "Member.Delete";
         public const string MemberIdentify = "Member.Identify";
         public const string UnionCreate = "Union.Create";
+        public const string UnionUpdate = "Union.Update";
         public const string UnionDelete = "Union.Delete";
         public const string UnionMemberAdd = "UnionMember.Add";
         public const string UnionMemberDelete = "UnionMember.Delete";
@@ -109,6 +110,7 @@ namespace 家谱.Models.Enums
             MemberDelete => "删除树成员",
             MemberIdentify => "认领树成员",
             UnionCreate => "新增婚姻单元",
+            UnionUpdate => "修改婚姻单元",
             UnionDelete => "删除婚姻单元",
             UnionMemberAdd => "新增家庭子女关联",
             UnionMemberDelete => "删除家庭子女关联",
